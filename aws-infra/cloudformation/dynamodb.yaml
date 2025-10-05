@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DynamoDB Resources for Blot Parser - Data storage table'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Environment name
+  
+  ProjectName:
+    Type: String
+    Description: Project name for resource naming
+
+Resources:
+  # DynamoDB Table for processed data
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${ProjectName}-data-${Environment}'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: vendor
+          AttributeType: S
+        - AttributeName: processed_at
+          AttributeType: S
+        - AttributeName: source_file
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: VendorIndex
+          KeySchema:
+            - AttributeName: vendor
+              KeyType: HASH
+            - AttributeName: processed_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: SourceFileIndex
+          KeySchema:
+            - AttributeName: source_file
+              KeyType: HASH
+            - AttributeName: processed_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: DataStorage
+
+  # DynamoDB Table for processing status
+  StatusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${ProjectName}-status-${Environment}'
+      AttributeDefinitions:
+        - AttributeName: file_id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: file_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: ProcessingStatus
+
+Outputs:
+  DataTableName:
+    Description: DynamoDB table for processed data
+    Value: !Ref DataTable
+    Export:
+      Name: !Sub '${ProjectName}-DataTable-${Environment}'
+  
+  DataTableArn:
+    Description: DynamoDB table ARN for processed data
+    Value: !GetAtt DataTable.Arn
+    Export:
+      Name: !Sub '${ProjectName}-DataTableArn-${Environment}'
+  
+  StatusTableName:
+    Description: DynamoDB table for processing status
+    Value: !Ref StatusTable
+    Export:
+      Name: !Sub '${ProjectName}-StatusTable-${Environment}'
+  
+  StatusTableArn:
+    Description: DynamoDB table ARN for processing status
+    Value: !GetAtt StatusTable.Arn
+    Export:
+      Name: !Sub '${ProjectName}-StatusTableArn-${Environment}'

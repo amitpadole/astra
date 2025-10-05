@@ -1,0 +1,19 @@
+extends: default
+
+rules:
+  # Disable rules that conflict with CloudFormation
+  line-length:
+    max: 120
+    level: warning
+  
+  # Allow CloudFormation intrinsic functions
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off']
+  
+  # Allow CloudFormation syntax
+  comments:
+    min-spaces-from-content: 1
+  
+  # Allow CloudFormation tags
+  tags:
+    check-missing: false

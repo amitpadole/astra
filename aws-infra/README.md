@@ -4,6 +4,21 @@ This directory contains the shared AWS infrastructure components for the Blot Pa
 
 ## Architecture
 
+### Modular CloudFormation Design
+
+The infrastructure uses a **parent-child stack pattern** for better modularity and maintainability:
+
+```
+Parent Stack (parent.yaml)
+├── S3 Stack (s3.yaml) - Input and deployment buckets
+├── DynamoDB Stack (dynamodb.yaml) - Data storage tables  
+├── IAM Stack (iam.yaml) - Roles and policies
+├── Lambda Stack (lambda.yaml) - Functions and triggers
+└── Monitoring Stack (monitoring.yaml) - Dashboards and alarms
+```
+
+### Component Overview
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    AWS Infrastructure                       │
@@ -58,14 +73,35 @@ This directory contains the shared AWS infrastructure components for the Blot Pa
 
 ### Step 1: Deploy Infrastructure
 
+You have two deployment options:
+
+#### Option A: Modular Deployment (Recommended)
+
 ```bash
-# Deploy shared infrastructure
+# Deploy modular infrastructure with parent-child stacks
+./deploy-modular.sh [environment] [region]
+
+# Examples:
+./deploy-modular.sh dev us-east-1
+./deploy-modular.sh prod us-west-2
+```
+
+#### Option B: Monolithic Deployment (Legacy)
+
+```bash
+# Deploy single CloudFormation stack
 ./deploy-infrastructure.sh [environment] [region]
 
 # Examples:
 ./deploy-infrastructure.sh dev us-east-1
 ./deploy-infrastructure.sh prod us-west-2
 ```
+
+**Benefits of Modular Deployment:**
+- Better separation of concerns
+- Easier to maintain and update
+- Independent stack management
+- Better for team collaboration
 
 ### Step 2: Deploy Lambda Functions
 

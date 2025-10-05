@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S3 Resources for Blot Parser - Input and Deployment buckets'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Environment name
+  
+  ProjectName:
+    Type: String
+    Description: Project name for resource naming
+  
+  AWSAccountId:
+    Type: String
+    Description: AWS Account ID
+
+Resources:
+  # S3 Bucket for input files
+  InputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-input-${Environment}-${AWSAccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ArchiveOldFiles
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 30
+              - StorageClass: GLACIER
+                TransitionInDays: 90
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: InputFiles
+
+  # S3 Bucket for Lambda deployments
+  DeploymentBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-deployments-${Environment}-${AWSAccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: LambdaDeployments
+
+  # S3 Bucket Policy for Input Bucket
+  InputBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref InputBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureConnections
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub '${InputBucket}/*'
+              - !GetAtt InputBucket.Arn
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+
+Outputs:
+  InputBucketName:
+    Description: S3 bucket for input files
+    Value: !Ref InputBucket
+    Export:
+      Name: !Sub '${ProjectName}-InputBucket-${Environment}'
+  
+  InputBucketArn:
+    Description: S3 bucket ARN for input files
+    Value: !GetAtt InputBucket.Arn
+    Export:
+      Name: !Sub '${ProjectName}-InputBucketArn-${Environment}'
+  
+  DeploymentBucketName:
+    Description: S3 bucket for Lambda deployments
+    Value: !Ref DeploymentBucket
+    Export:
+      Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}'
+  
+  DeploymentBucketArn:
+    Description: S3 bucket ARN for deployments
+    Value: !GetAtt DeploymentBucket.Arn
+    Export:
+      Name: !Sub '${ProjectName}-DeploymentBucketArn-${Environment}'

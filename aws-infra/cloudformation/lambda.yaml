@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda Resources for Blot Parser - Function and triggers'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Environment name
+  
+  ProjectName:
+    Type: String
+    Description: Project name for resource naming
+  
+  S3InputBucket:
+    Type: String
+    Description: S3 input bucket name
+  
+  DynamoDBTableName:
+    Type: String
+    Description: DynamoDB table name
+  
+  LambdaRoleArn:
+    Type: String
+    Description: IAM role ARN for Lambda function
+
+Resources:
+  # Lambda Function
+  BlotParserLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${Environment}'
+      Runtime: python3.11
+      Role: !Ref LambdaRoleArn
+      Handler: lambda_function.lambda_handler
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder function'}
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableName
+          S3_BUCKET: !Ref S3InputBucket
+          AWS_REGION: !Ref AWS::Region
+          ENVIRONMENT: !Ref Environment
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: ExcelProcessing
+
+  # Lambda Function Alias for environment
+  BlotParserLambdaAlias:
+    Type: AWS::Lambda::Alias
+    Properties:
+      FunctionName: !Ref BlotParserLambda
+      FunctionVersion: !GetAtt BlotParserLambda.Version
+      Name: !Ref Environment
+      Description: !Sub 'Alias for ${Environment} environment'
+
+  # Lambda Permission for S3
+  S3LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BlotParserLambda
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub 'arn:aws:s3:::${S3InputBucket}'
+
+  # S3 Bucket Notification Configuration
+  S3BucketNotification:
+    Type: AWS::S3::Bucket
+    Properties:
+      Bucket: !Ref S3InputBucket
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt BlotParserLambda.Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .xlsx
+                  - Name: suffix
+                    Value: .xls
+
+  # CloudWatch Log Group
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${Environment}'
+      RetentionInDays: 14
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Lambda Function for testing
+  TestLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-test-${Environment}'
+      Runtime: python3.11
+      Role: !Ref LambdaRoleArn
+      Handler: index.handler
+      Code:
+        ZipFile: |
+          def handler(event, context):
+              return {'statusCode': 200, 'body': 'Test function'}
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: Testing
+
+Outputs:
+  LambdaFunctionName:
+    Description: Lambda function name
+    Value: !Ref BlotParserLambda
+    Export:
+      Name: !Sub '${ProjectName}-LambdaFunction-${Environment}'
+  
+  LambdaFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt BlotParserLambda.Arn
+    Export:
+      Name: !Sub '${ProjectName}-LambdaFunctionArn-${Environment}'
+  
+  LambdaFunctionVersion:
+    Description: Lambda function version
+    Value: !GetAtt BlotParserLambda.Version
+    Export:
+      Name: !Sub '${ProjectName}-LambdaVersion-${Environment}'
+  
+  LambdaAliasArn:
+    Description: Lambda function alias ARN
+    Value: !Ref BlotParserLambdaAlias
+    Export:
+      Name: !Sub '${ProjectName}-LambdaAlias-${Environment}'
+  
+  TestLambdaFunctionName:
+    Description: Test Lambda function name
+    Value: !Ref TestLambda
+    Export:
+      Name: !Sub '${ProjectName}-TestLambda-${Environment}'
