@@ -15,10 +15,7 @@ on:
     branches: [develop, main]
     paths:
       - 'aws-infra/cloudformation/s3.yaml'
-      - 'aws-infra/cloudformation/dynamodb.yaml'
-      - 'aws-infra/cloudformation/iam.yaml'
-      - 'aws-infra/cloudformation/lambda.yaml'
-      - 'aws-infra/cloudformation/monitoring.yaml'
+      - 'aws-infra/cloudformation/network.yaml'
       - 'aws-infra/cloudformation/parent.yaml'
       - '.github/workflows/deploy-infrastructure.yaml'
 
@@ -46,28 +43,18 @@ jobs:
           echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
           echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}-${TIMESTAMP}" >> $GITHUB_ENV
 
-      - name: Check if network infrastructure exists
-        run: |
-          if ! aws cloudformation describe-stacks --stack-name astra-network-$ENVIRONMENT --query 'Stacks[0].StackStatus' --output text 2>/dev/null; then
-            echo "❌ Network infrastructure not found. Please deploy network first."
-            echo "Run: gh workflow run deploy-network.yaml -f environment=$ENVIRONMENT"
-            exit 1
-          else
-            echo "✅ Network infrastructure found"
-          fi
-
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
         run: |
+          echo "📤 Uploading CloudFormation templates to S3..."
           aws s3 cp cloudformation/s3.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/s3.yaml
-          aws s3 cp cloudformation/dynamodb.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/dynamodb.yaml
-          aws s3 cp cloudformation/iam.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/iam.yaml
-          aws s3 cp cloudformation/lambda.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/lambda.yaml
-          aws s3 cp cloudformation/monitoring.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/monitoring.yaml
+          aws s3 cp cloudformation/network.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/network.yaml
           aws s3 cp cloudformation/parent.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/parent.yaml
+          echo "✅ Templates uploaded successfully"
 
-      - name: Deploy Application Infrastructure
+      - name: Deploy Application Infrastructure (Phase 1: S3 + Network)
         run: |
+          echo "🚀 Deploying Phase 1: S3 + Network Infrastructure..."
           aws cloudformation deploy \
             --template-file aws-infra/cloudformation/parent.yaml \
             --stack-name $STACK_NAME \
@@ -80,10 +67,18 @@ jobs:
 
       - name: Verify Deployment
         run: |
-          echo "Application infrastructure deployed successfully!"
+          echo "✅ Phase 1 deployment completed successfully!"
           echo "Stack Name: $STACK_NAME"
           echo "Environment: $ENVIRONMENT"
-          
-          # Check if all child stacks are healthy
-          echo "Checking child stack status..."
-          aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE --query "StackSummaries[?contains(StackName, 'astra-infrastructure-$ENVIRONMENT')].{Name:StackName,Status:StackStatus}" --output table
+          echo ""
+          echo "📋 Resources Created:"
+          echo "S3 Input Bucket: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`InputBucketName`].OutputValue' --output text)"
+          echo "S3 Deployment Bucket: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`DeploymentBucketName`].OutputValue' --output text)"
+          echo "VPC ID: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue' --output text)"
+          echo "Public Subnet: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`PublicSubnetId`].OutputValue' --output text)"
+          echo "Private Subnet: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnetId`].OutputValue' --output text)"
+          echo ""
+          echo "🎯 Next Steps:"
+          echo "1. Verify resources in AWS Console"
+          echo "2. Test network connectivity"
+          echo "3. Ready for Phase 2: DynamoDB + IAM + Lambda"

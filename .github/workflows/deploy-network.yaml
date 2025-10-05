@@ -58,7 +58,12 @@ jobs:
 
       - name: Verify Network Deployment
         run: |
-          echo "Network infrastructure deployed successfully!"
+          echo "✅ Network infrastructure deployed successfully!"
+          echo "Stack Name: $STACK_NAME"
+          echo "Environment: $ENVIRONMENT"
+          echo ""
+          echo "📋 Network Resources Created:"
           echo "VPC ID: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue' --output text)"
           echo "Public Subnet: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`PublicSubnetId`].OutputValue' --output text)"
           echo "Private Subnet: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnetId`].OutputValue' --output text)"
+          echo "Security Group: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`DefaultSecurityGroupId`].OutputValue' --output text)"

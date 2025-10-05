@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Shared Network Infrastructure for Astra - VPC, Subnets, NAT Gateway (deploy once, reuse)'
+Description: 'Minimal Network Infrastructure for Astra - VPC, Subnets, NAT Gateway (Phase 1)'
 
 Parameters:
   Environment:
@@ -189,63 +189,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${ProjectName}-default-sg-${Environment}'
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-
-  # VPC Endpoint for S3 - Deploy once, reuse
-  S3VPCEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      VpcId: !Ref VPC
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
-      VpcEndpointType: Gateway
-      RouteTableIds:
-        - !Ref PrivateRouteTable
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action:
-              - s3:GetObject
-              - s3:PutObject
-              - s3:DeleteObject
-            Resource: '*'
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-s3-endpoint-${Environment}'
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-
-  # VPC Endpoint for DynamoDB - Deploy once, reuse
-  DynamoDBVPCEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      VpcId: !Ref VPC
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
-      VpcEndpointType: Gateway
-      RouteTableIds:
-        - !Ref PrivateRouteTable
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action:
-              - dynamodb:GetItem
-              - dynamodb:PutItem
-              - dynamodb:UpdateItem
-              - dynamodb:DeleteItem
-              - dynamodb:Query
-              - dynamodb:Scan
-            Resource: '*'
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-dynamodb-endpoint-${Environment}'
         - Key: Project
           Value: !Ref ProjectName
         - Key: Environment
