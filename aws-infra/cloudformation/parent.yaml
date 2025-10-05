@@ -1,27 +1,23 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Parent CloudFormation Stack for Astra - Phase 1: Network Only'
+Description: 'Astra Infrastructure - Parent CloudFormation Stack'
 
 Parameters:
   Environment:
     Type: String
-    Default: dev
-    AllowedValues: [dev, prod]
     Description: Environment name
+    Default: dev
   
   ProjectName:
     Type: String
-    Default: astra
     Description: Project name for resource naming
+    Default: astra
   
   AWSAccountId:
     Type: String
     Description: AWS Account ID
-    MinLength: 12
-    MaxLength: 12
-    AllowedPattern: '^[0-9]{12}$'
 
 Resources:
-  # S3 Resources Stack (must be first to create deployment bucket)
+  # Phase 1: Core Infrastructure (S3 + Network)
   S3Stack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -36,7 +32,6 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-  # Network Resources Stack (depends on S3Stack)
   NetworkStack:
     Type: AWS::CloudFormation::Stack
     DependsOn: S3Stack
@@ -53,18 +48,18 @@ Resources:
   
   #Phase 2 - Uncomment these stacks gradually
   # DynamoDB Resources Stack (depends on S3Stack)
-  DynamoDBStack:
-     Type: AWS::CloudFormation::Stack
-     Properties:
-       TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/dynamodb.yaml'
-       Parameters:
-         Environment: !Ref Environment
-         ProjectName: !Ref ProjectName
-       Tags:
-         - Key: Project
-           Value: !Ref ProjectName
-         - Key: Environment
-           Value: !Ref Environment
+  # DynamoDBStack:
+  #    Type: AWS::CloudFormation::Stack
+  #    Properties:
+  #      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/dynamodb.yaml'
+  #      Parameters:
+  #        Environment: !Ref Environment
+  #        ProjectName: !Ref ProjectName
+  #      Tags:
+  #        - Key: Project
+  #          Value: !Ref ProjectName
+  #        - Key: Environment
+  #          Value: !Ref Environment
 
   # IAM Resources Stack (depends on S3Stack and DynamoDBStack)
   # IAMStack:
@@ -83,10 +78,10 @@ Resources:
   #       - Key: Environment
   #         Value: !Ref Environment
 
-  # Lambda Resources Stack (depends on all previous stacks)
+  # Lambda Resources Stack (depends on IAMStack and DynamoDBStack)
   # LambdaStack:
   #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: [S3Stack, DynamoDBStack, IAMStack]
+  #   DependsOn: [IAMStack, DynamoDBStack]
   #   Properties:
   #     TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/lambda.yaml'
   #     Parameters:
@@ -95,13 +90,6 @@ Resources:
   #       S3InputBucket: !GetAtt S3Stack.Outputs.InputBucketName
   #       DynamoDBTableName: !GetAtt DynamoDBStack.Outputs.DataTableName
   #       LambdaRoleArn: !GetAtt IAMStack.Outputs.LambdaRoleArn
-  #       # Reference existing network infrastructure
-  #       VpcId: !ImportValue
-  #         Fn::Sub: '${ProjectName}-VpcId-${Environment}'
-  #       PrivateSubnetId: !ImportValue
-  #         Fn::Sub: '${ProjectName}-PrivateSubnetId-${Environment}'
-  #       DefaultSecurityGroupId: !ImportValue
-  #         Fn::Sub: '${ProjectName}-DefaultSecurityGroupId-${Environment}'
   #     Tags:
   #       - Key: Project
   #         Value: !Ref ProjectName
@@ -111,14 +99,13 @@ Resources:
   # Monitoring Resources Stack (depends on LambdaStack)
   # MonitoringStack:
   #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: [LambdaStack, DynamoDBStack]
+  #   DependsOn: LambdaStack
   #   Properties:
   #     TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/monitoring.yaml'
   #     Parameters:
   #       Environment: !Ref Environment
   #       ProjectName: !Ref ProjectName
   #       LambdaFunctionName: !GetAtt LambdaStack.Outputs.LambdaFunctionName
-  #       DynamoDBTableName: !GetAtt DynamoDBStack.Outputs.DataTableName
   #     Tags:
   #       - Key: Project
   #         Value: !Ref ProjectName
@@ -170,19 +157,20 @@ Outputs:
     Export:
       Name: !Sub '${ProjectName}-DefaultSecurityGroupId-${Environment}'
 
+  # 
   # TODO: Phase 2 - Uncomment these outputs gradually
   # DynamoDB Outputs
-  DataTableName:
-    Description: DynamoDB table for processed data
-    Value: !GetAtt DynamoDBStack.Outputs.DataTableName
-    Export:
-      Name: !Sub '${ProjectName}-DataTable-${Environment}'
+  # DataTableName:
+  #   Description: DynamoDB table for processed data
+  #   Value: !GetAtt DynamoDBStack.Outputs.DataTableName
+  #   Export:
+  #     Name: !Sub '${ProjectName}-DataTable-${Environment}'
   
-  DataTableArn:
-    Description: DynamoDB table ARN
-    Value: !GetAtt DynamoDBStack.Outputs.DataTableArn
-    Export:
-      Name: !Sub '${ProjectName}-DataTableArn-${Environment}'
+  # DataTableArn:
+  #   Description: DynamoDB table ARN
+  #   Value: !GetAtt DynamoDBStack.Outputs.DataTableArn
+  #   Export:
+  #     Name: !Sub '${ProjectName}-DataTableArn-${Environment}'
   
   # IAM Outputs
   # LambdaRoleArn:
@@ -198,14 +186,8 @@ Outputs:
   #   Export:
   #     Name: !Sub '${ProjectName}-LambdaFunction-${Environment}'
   
-  # LambdaFunctionArn:
-  #   Description: Lambda function ARN
-  #   Value: !GetAtt LambdaStack.Outputs.LambdaFunctionArn
-  #   Export:
-  #     Name: !Sub '${ProjectName}-LambdaFunctionArn-${Environment}'
-  
   # Monitoring Outputs
-  # CloudWatchDashboardUrl:
+  # DashboardUrl:
   #   Description: CloudWatch Dashboard URL
   #   Value: !GetAtt MonitoringStack.Outputs.DashboardUrl
   #   Export:
