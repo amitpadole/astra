@@ -19,7 +19,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  PROJECT_NAME: blot-parser
+  PROJECT_NAME: astra
 
 jobs:
   deploy-dev:
@@ -57,29 +57,17 @@ jobs:
           # Change to aws-infra directory
           cd aws-infra
           
-          # Upload child stack templates
-          echo "Uploading vpc.yaml..."
-          aws s3 cp cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
-          
+          # Upload only essential templates for now
           echo "Uploading s3.yaml..."
           aws s3 cp cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
           
-          echo "Uploading dynamodb.yaml..."
-          aws s3 cp cloudformation/dynamodb.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/dynamodb.yaml"
-          
-          echo "Uploading iam.yaml..."
-          aws s3 cp cloudformation/iam.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/iam.yaml"
-          
-          echo "Uploading lambda.yaml..."
-          aws s3 cp cloudformation/lambda.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/lambda.yaml"
-          
-          echo "Uploading monitoring.yaml..."
-          aws s3 cp cloudformation/monitoring.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/monitoring.yaml"
+          echo "Uploading vpc.yaml..."
+          aws s3 cp cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
 
       - name: Deploy CloudFormation stack
         run: |
           aws cloudformation deploy \
-            --template-file aws-infra/cloudformation/parent.yaml \
+            --template-file aws-infra/cloudformation/parent-simple.yaml \
             --stack-name $STACK_NAME \
             --parameter-overrides \
               Environment=dev \
@@ -91,22 +79,9 @@ jobs:
       - name: Get stack outputs
         id: stack-outputs
         run: |
-          
           INPUT_BUCKET=$(aws cloudformation describe-stacks \
             --stack-name $STACK_NAME \
             --query 'Stacks[0].Outputs[?OutputKey==`InputBucketName`].OutputValue' \
-            --output text \
-            --region $AWS_REGION)
-          
-          DATA_TABLE=$(aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs[?OutputKey==`DataTableName`].OutputValue' \
-            --output text \
-            --region $AWS_REGION)
-          
-          LAMBDA_ROLE=$(aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs[?OutputKey==`LambdaRoleArn`].OutputValue' \
             --output text \
             --region $AWS_REGION)
           
@@ -116,28 +91,24 @@ jobs:
             --output text \
             --region $AWS_REGION)
           
-          LAMBDA_FUNCTION=$(aws cloudformation describe-stacks \
+          VPC_ID=$(aws cloudformation describe-stacks \
             --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs[?OutputKey==`LambdaFunctionName`].OutputValue' \
+            --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue' \
             --output text \
             --region $AWS_REGION)
           
           echo "INPUT_BUCKET=$INPUT_BUCKET" >> $GITHUB_OUTPUT
-          echo "DATA_TABLE=$DATA_TABLE" >> $GITHUB_OUTPUT
-          echo "LAMBDA_ROLE=$LAMBDA_ROLE" >> $GITHUB_OUTPUT
           echo "DEPLOYMENT_BUCKET=$DEPLOYMENT_BUCKET" >> $GITHUB_OUTPUT
-          echo "LAMBDA_FUNCTION=$LAMBDA_FUNCTION" >> $GITHUB_OUTPUT
+          echo "VPC_ID=$VPC_ID" >> $GITHUB_OUTPUT
 
-      - name: Create environment file for Lambda
+      - name: Create environment file
         run: |
           cat > blot-parser/.env << EOF
           # AWS Infrastructure Configuration (DEV)
           AWS_REGION=$AWS_REGION
           INPUT_BUCKET=${{ steps.stack-outputs.outputs.INPUT_BUCKET }}
-          DATA_TABLE=${{ steps.stack-outputs.outputs.DATA_TABLE }}
-          LAMBDA_ROLE_ARN=${{ steps.stack-outputs.outputs.LAMBDA_ROLE }}
           DEPLOYMENT_BUCKET=${{ steps.stack-outputs.outputs.DEPLOYMENT_BUCKET }}
-          LAMBDA_FUNCTION_NAME=${{ steps.stack-outputs.outputs.LAMBDA_FUNCTION }}
+          VPC_ID=${{ steps.stack-outputs.outputs.VPC_ID }}
           ENVIRONMENT=dev
           PROJECT_NAME=$PROJECT_NAME
           LOG_LEVEL=INFO
