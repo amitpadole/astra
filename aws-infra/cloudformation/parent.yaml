@@ -51,7 +51,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
   
-  Phase 2 - Uncomment these stacks gradually
+  #Phase 2 - Uncomment these stacks gradually
   # DynamoDB Resources Stack (depends on S3Stack)
   DynamoDBStack:
      Type: AWS::CloudFormation::Stack
