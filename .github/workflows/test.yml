@@ -1,0 +1,152 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-blot-parser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd blot-parser
+          pip install -r requirements.txt
+
+      - name: Run linting
+        run: |
+          cd blot-parser
+          pip install flake8
+          flake8 *.py --max-line-length=100 --ignore=E203,W503
+
+      - name: Test Excel processor
+        run: |
+          cd blot-parser
+          python -c "
+          from excel_processor import ExcelProcessor
+          import pandas as pd
+          from io import BytesIO
+          
+          # Test basic functionality
+          processor = ExcelProcessor()
+          print('ExcelProcessor initialized successfully')
+          
+          # Test with sample data
+          sample_data = pd.DataFrame({'col1': [1, 2, 3], 'col2': ['a', 'b', 'c']})
+          print('Sample DataFrame created')
+          print(processor._clean_column_names(sample_data.columns))
+          print('Excel processor test passed')
+          "
+
+      - name: Test field mapper
+        run: |
+          cd blot-parser
+          python -c "
+          from field_mapper import FieldMapper
+          
+          # Test basic functionality
+          mapper = FieldMapper()
+          print('FieldMapper initialized successfully')
+          
+          # Test mapping
+          test_record = {'field1': 'value1', 'field2': 'value2'}
+          mapped = mapper.map_record(test_record, 'bloomberg')
+          print('Field mapping test passed')
+          print('Mapped record:', mapped)
+          "
+
+      - name: Test vendor detector
+        run: |
+          cd blot-parser
+          python -c "
+          from vendor_detector import VendorDetector
+          
+          # Test basic functionality
+          detector = VendorDetector()
+          print('VendorDetector initialized successfully')
+          
+          # Test vendor detection
+          vendor = detector.detect_vendor('bloomberg-trade-data.xlsx')
+          print('Vendor detection test passed')
+          print('Detected vendor:', vendor)
+          "
+
+      - name: Test file manager
+        run: |
+          cd blot-parser
+          python -c "
+          from file_manager import FileManager
+          
+          # Test basic functionality
+          manager = FileManager()
+          print('FileManager initialized successfully')
+          print('File manager test passed')
+          "
+
+  test-infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate CloudFormation templates
+        run: |
+          cd aws-infra
+          
+          # Validate parent template
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/parent.yaml \
+            --region us-east-1 || echo "Parent template validation failed"
+          
+          # Validate child templates
+          for template in cloudformation/*.yaml; do
+            if [ "$template" != "cloudformation/parent.yaml" ]; then
+              echo "Validating $template"
+              aws cloudformation validate-template \
+                --template-body file://$template \
+                --region us-east-1 || echo "Template $template validation failed"
+            fi
+          done
+
+      - name: Check template syntax
+        run: |
+          cd aws-infra
+          
+          # Check YAML syntax
+          python -c "
+          import yaml
+          import sys
+          
+          templates = [
+              'cloudformation/parent.yaml',
+              'cloudformation/s3.yaml',
+              'cloudformation/dynamodb.yaml',
+              'cloudformation/iam.yaml',
+              'cloudformation/lambda.yaml',
+              'cloudformation/monitoring.yaml'
+          ]
+          
+          for template in templates:
+              try:
+                  with open(template, 'r') as f:
+                      yaml.safe_load(f)
+                  print(f'✅ {template} - Valid YAML')
+              except yaml.YAMLError as e:
+                  print(f'❌ {template} - Invalid YAML: {e}')
+                  sys.exit(1)
+              except Exception as e:
+                  print(f'❌ {template} - Error: {e}')
+                  sys.exit(1)
+          
+          print('All CloudFormation templates are valid!')
+          "

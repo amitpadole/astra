@@ -1,0 +1,265 @@
+name: Deploy Lambda Functions
+
+on:
+  push:
+    branches: [ develop ]
+    paths: [ 'blot-parser/**' ]
+  pull_request:
+    branches: [ develop ]
+    paths: [ 'blot-parser/**' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: blot-parser
+
+jobs:
+  deploy-lambda-dev:
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'dev'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Load environment variables
+        run: |
+          if [ -f blot-parser/.env ]; then
+            echo "Loading environment variables from .env file"
+            export $(cat blot-parser/.env | xargs)
+          else
+            echo "No .env file found, using defaults"
+            export ENVIRONMENT=dev
+            export LAMBDA_FUNCTION_NAME="${PROJECT_NAME}-dev"
+            export DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-$(aws sts get-caller-identity --query Account --output text)"
+          fi
+          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_ENV
+          echo "LAMBDA_FUNCTION_NAME=$LAMBDA_FUNCTION_NAME" >> $GITHUB_ENV
+          echo "DEPLOYMENT_BUCKET=$DEPLOYMENT_BUCKET" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: |
+          cd blot-parser
+          pip install -r requirements-lambda.txt
+
+      - name: Create deployment package
+        run: |
+          cd blot-parser
+          
+          # Create package directory
+          mkdir -p package
+          
+          # Install dependencies into package directory
+          pip install -r requirements-lambda.txt --target package
+          
+          # Copy application code
+          cp *.py package/
+          cp -r mappings package/mappings/
+          
+          # Create ZIP file
+          cd package
+          zip -r ../lambda-deployment.zip .
+          cd ..
+          
+          # Upload to S3
+          aws s3 cp lambda-deployment.zip "s3://$DEPLOYMENT_BUCKET/lambda-deployment.zip"
+
+      - name: Deploy Lambda function
+        run: |
+          cd blot-parser
+          
+          # Update Lambda function code
+          aws lambda update-function-code \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --s3-bucket $DEPLOYMENT_BUCKET \
+            --s3-key lambda-deployment.zip \
+            --region $AWS_REGION
+          
+          # Update function configuration if needed
+          aws lambda update-function-configuration \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --timeout 300 \
+            --memory-size 512 \
+            --region $AWS_REGION
+
+      - name: Test Lambda function
+        run: |
+          # Create a test event
+          cat > test-event.json << EOF
+          {
+            "Records": [
+              {
+                "s3": {
+                  "bucket": {
+                    "name": "test-bucket"
+                  },
+                  "object": {
+                    "key": "test-file.xlsx"
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+          
+          # Test the function
+          aws lambda invoke \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --payload file://test-event.json \
+            --region $AWS_REGION \
+            response.json
+          
+          # Check response
+          cat response.json
+          if grep -q "errorMessage" response.json; then
+            echo "Lambda function test failed"
+            exit 1
+          else
+            echo "Lambda function test passed"
+          fi
+
+      - name: Cleanup
+        run: |
+          cd blot-parser
+          rm -rf package lambda-deployment.zip test-event.json response.json
+
+  deploy-lambda-prod:
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'prod'
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Load environment variables
+        run: |
+          if [ -f blot-parser/.env ]; then
+            echo "Loading environment variables from .env file"
+            export $(cat blot-parser/.env | xargs)
+          else
+            echo "No .env file found, using defaults"
+            export ENVIRONMENT=prod
+            export LAMBDA_FUNCTION_NAME="${PROJECT_NAME}-prod"
+            export DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-prod-$(aws sts get-caller-identity --query Account --output text)"
+          fi
+          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_ENV
+          echo "LAMBDA_FUNCTION_NAME=$LAMBDA_FUNCTION_NAME" >> $GITHUB_ENV
+          echo "DEPLOYMENT_BUCKET=$DEPLOYMENT_BUCKET" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: |
+          cd blot-parser
+          pip install -r requirements-lambda.txt
+
+      - name: Create deployment package
+        run: |
+          cd blot-parser
+          
+          # Create package directory
+          mkdir -p package
+          
+          # Install dependencies into package directory
+          pip install -r requirements-lambda.txt --target package
+          
+          # Copy application code
+          cp *.py package/
+          cp -r mappings package/mappings/
+          
+          # Create ZIP file
+          cd package
+          zip -r ../lambda-deployment.zip .
+          cd ..
+          
+          # Upload to S3
+          aws s3 cp lambda-deployment.zip "s3://$DEPLOYMENT_BUCKET/lambda-deployment.zip"
+
+      - name: Deploy Lambda function
+        run: |
+          cd blot-parser
+          
+          # Update Lambda function code
+          aws lambda update-function-code \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --s3-bucket $DEPLOYMENT_BUCKET \
+            --s3-key lambda-deployment.zip \
+            --region $AWS_REGION
+          
+          # Update function configuration if needed
+          aws lambda update-function-configuration \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --timeout 300 \
+            --memory-size 512 \
+            --region $AWS_REGION
+
+      - name: Test Lambda function
+        run: |
+          # Create a test event
+          cat > test-event.json << EOF
+          {
+            "Records": [
+              {
+                "s3": {
+                  "bucket": {
+                    "name": "test-bucket"
+                  },
+                  "object": {
+                    "key": "test-file.xlsx"
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+          
+          # Test the function
+          aws lambda invoke \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --payload file://test-event.json \
+            --region $AWS_REGION \
+            response.json
+          
+          # Check response
+          cat response.json
+          if grep -q "errorMessage" response.json; then
+            echo "Lambda function test failed"
+            exit 1
+          else
+            echo "Lambda function test passed"
+          fi
+
+      - name: Cleanup
+        run: |
+          cd blot-parser
+          rm -rf package lambda-deployment.zip test-event.json response.json

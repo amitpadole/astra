@@ -1,0 +1,10 @@
+name: prod
+protection_rules:
+  - type: required_reviewers
+    required_reviewers: 2
+  - type: wait_timer
+    wait_timer: 5
+  - type: required_status_checks
+    required_status_checks:
+      - test
+      - deploy-infrastructure

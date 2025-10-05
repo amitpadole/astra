@@ -1,0 +1,138 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: [ develop ]
+    paths: [ 'aws-infra/**' ]
+  pull_request:
+    branches: [ develop ]
+    paths: [ 'aws-infra/**' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: blot-parser
+
+jobs:
+  deploy-dev:
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'dev'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set environment variables
+        run: |
+          echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          echo "STACK_NAME=blot-parser-infrastructure-dev" >> $GITHUB_ENV
+          echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+
+      - name: Upload CloudFormation templates to S3
+        run: |
+          cd aws-infra
+          
+          # Create deployment bucket if it doesn't exist
+          DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-${AWS_ACCOUNT_ID}"
+          aws s3 mb "s3://$DEPLOYMENT_BUCKET" --region $AWS_REGION || echo "Bucket already exists"
+          
+          # Upload child stack templates
+          aws s3 cp cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
+          aws s3 cp cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
+          aws s3 cp cloudformation/dynamodb.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/dynamodb.yaml"
+          aws s3 cp cloudformation/iam.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/iam.yaml"
+          aws s3 cp cloudformation/lambda.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/lambda.yaml"
+          aws s3 cp cloudformation/monitoring.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/monitoring.yaml"
+
+      - name: Deploy CloudFormation stack
+        run: |
+          cd aws-infra
+          aws cloudformation deploy \
+            --template-file cloudformation/parent.yaml \
+            --stack-name $STACK_NAME \
+            --parameter-overrides \
+              Environment=dev \
+              ProjectName=$PROJECT_NAME \
+              AWSAccountId=$AWS_ACCOUNT_ID \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region $AWS_REGION
+
+      - name: Get stack outputs
+        id: stack-outputs
+        run: |
+          cd aws-infra
+          
+          INPUT_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`InputBucketName`].OutputValue' \
+            --output text \
+            --region $AWS_REGION)
+          
+          DATA_TABLE=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`DataTableName`].OutputValue' \
+            --output text \
+            --region $AWS_REGION)
+          
+          LAMBDA_ROLE=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`LambdaRoleArn`].OutputValue' \
+            --output text \
+            --region $AWS_REGION)
+          
+          DEPLOYMENT_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`DeploymentBucketName`].OutputValue' \
+            --output text \
+            --region $AWS_REGION)
+          
+          LAMBDA_FUNCTION=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`LambdaFunctionName`].OutputValue' \
+            --output text \
+            --region $AWS_REGION)
+          
+          echo "INPUT_BUCKET=$INPUT_BUCKET" >> $GITHUB_OUTPUT
+          echo "DATA_TABLE=$DATA_TABLE" >> $GITHUB_OUTPUT
+          echo "LAMBDA_ROLE=$LAMBDA_ROLE" >> $GITHUB_OUTPUT
+          echo "DEPLOYMENT_BUCKET=$DEPLOYMENT_BUCKET" >> $GITHUB_OUTPUT
+          echo "LAMBDA_FUNCTION=$LAMBDA_FUNCTION" >> $GITHUB_OUTPUT
+
+      - name: Create environment file for Lambda
+        run: |
+          cat > blot-parser/.env << EOF
+          # AWS Infrastructure Configuration (DEV)
+          AWS_REGION=$AWS_REGION
+          INPUT_BUCKET=${{ steps.stack-outputs.outputs.INPUT_BUCKET }}
+          DATA_TABLE=${{ steps.stack-outputs.outputs.DATA_TABLE }}
+          LAMBDA_ROLE_ARN=${{ steps.stack-outputs.outputs.LAMBDA_ROLE }}
+          DEPLOYMENT_BUCKET=${{ steps.stack-outputs.outputs.DEPLOYMENT_BUCKET }}
+          LAMBDA_FUNCTION_NAME=${{ steps.stack-outputs.outputs.LAMBDA_FUNCTION }}
+          ENVIRONMENT=dev
+          PROJECT_NAME=$PROJECT_NAME
+          LOG_LEVEL=INFO
+          EOF
+
+      - name: Commit environment file
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add blot-parser/.env
+          git commit -m "Update environment configuration for DEV" || echo "No changes to commit"
+          git push
+

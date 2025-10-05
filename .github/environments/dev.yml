@@ -1,0 +1,4 @@
+name: dev
+protection_rules:
+  - type: wait_timer
+    wait_timer: 0
