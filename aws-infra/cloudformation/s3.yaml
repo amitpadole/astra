@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'S3 Resources for Blot Parser - Input and Deployment buckets'
+Description: 'S3 Resources for Astra - Input and Deployment buckets'
 
 Parameters:
   Environment:
@@ -19,7 +19,7 @@ Resources:
   InputBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${ProjectName}-input-${Environment}-${AWSAccountId}'
+      BucketName: !Sub '${ProjectName}-input-${Environment}-${AWSAccountId}-${AWS::StackId}'
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -52,7 +52,7 @@ Resources:
   DeploymentBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${ProjectName}-deployments-${Environment}-${AWSAccountId}'
+      BucketName: !Sub '${ProjectName}-deployments-${Environment}-${AWSAccountId}-${AWS::StackId}'
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -96,22 +96,22 @@ Outputs:
     Description: S3 bucket for input files
     Value: !Ref InputBucket
     Export:
-      Name: !Sub '${ProjectName}-InputBucket-${Environment}'
+      Name: !Sub '${ProjectName}-InputBucket-${Environment}-${AWS::StackId}'
   
   InputBucketArn:
     Description: S3 bucket ARN for input files
     Value: !GetAtt InputBucket.Arn
     Export:
-      Name: !Sub '${ProjectName}-InputBucketArn-${Environment}'
+      Name: !Sub '${ProjectName}-InputBucketArn-${Environment}-${AWS::StackId}'
   
   DeploymentBucketName:
     Description: S3 bucket for Lambda deployments
     Value: !Ref DeploymentBucket
     Export:
-      Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}'
+      Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}-${AWS::StackId}'
   
   DeploymentBucketArn:
     Description: S3 bucket ARN for deployments
     Value: !GetAtt DeploymentBucket.Arn
     Export:
-      Name: !Sub '${ProjectName}-DeploymentBucketArn-${Environment}'
+      Name: !Sub '${ProjectName}-DeploymentBucketArn-${Environment}-${AWS::StackId}'

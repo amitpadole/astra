@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'VPC Infrastructure for LCPL - 4096 IPs with public/private subnets in each AZ'
+Description: 'VPC Infrastructure for Astra - 4096 IPs with public/private subnets in each AZ'
 
 Parameters:
   Environment:
@@ -10,12 +10,12 @@ Parameters:
   
   ProjectName:
     Type: String
-    Default: blot-parser
+    Default: astra
     Description: Project name for resource naming
   
   VpcName:
     Type: String
-    Default: lcpl-vpc
+    Default: astra-vpc
     Description: Name for the VPC
 
 Resources:
@@ -28,11 +28,11 @@ Resources:
       EnableDnsSupport: true
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
 
   # Internet Gateway
   InternetGateway:
@@ -40,11 +40,11 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-igw-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-igw-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
 
   # Attach Internet Gateway to VPC
   InternetGatewayAttachment:
@@ -53,44 +53,43 @@ Resources:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
 
-  # Public Subnets (20% of IPs = ~819 IPs per subnet)
-  # Single AZ for cost optimization
-  PublicSubnet1:
+  # Public Subnet (20% of IPs - 10.0.0.0/22 = 1024 IPs)
+  PublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs '']
       CidrBlock: 10.0.0.0/22
+      AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-public-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-public-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
         - Key: Type
           Value: Public
 
-  # Private Subnets (80% of IPs = ~3277 IPs per subnet)
-  # Single AZ for cost optimization
-  PrivateSubnet1:
+  # Private Subnet (80% of IPs - 10.0.4.0/22 = 1024 IPs)
+  PrivateSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs '']
       CidrBlock: 10.0.4.0/22
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-private-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-private-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
         - Key: Type
           Value: Private
 
-  # Elastic IP for NAT Gateway (Single AZ for cost optimization)
+  # Elastic IP for NAT Gateway
   NatGatewayEIP:
     Type: AWS::EC2::EIP
     DependsOn: InternetGatewayAttachment
@@ -98,52 +97,53 @@ Resources:
       Domain: vpc
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-nat-eip-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-nat-eip-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
 
-  # NAT Gateway (Single AZ for cost optimization)
+  # NAT Gateway
   NatGateway:
     Type: AWS::EC2::NatGateway
     Properties:
       AllocationId: !GetAtt NatGatewayEIP.AllocationId
-      SubnetId: !Ref PublicSubnet1
+      SubnetId: !Ref PublicSubnet
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-nat-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-nat-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
 
-  # Route Tables
+  # Route Table for Public Subnet
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-public-rt-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-public-rt-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
 
+  # Route Table for Private Subnet
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-private-rt-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-private-rt-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
 
-  # Routes
+  # Route to Internet Gateway for Public Subnet
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
@@ -152,6 +152,7 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
+  # Route to NAT Gateway for Private Subnet
   PrivateRoute:
     Type: AWS::EC2::Route
     Properties:
@@ -159,44 +160,45 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway
 
-  # Subnet Route Table Associations
+  # Associate Public Subnet with Public Route Table
   PublicSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
+      SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
-      SubnetId: !Ref PublicSubnet1
 
+  # Associate Private Subnet with Private Route Table
   PrivateSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
+      SubnetId: !Ref PrivateSubnet
       RouteTableId: !Ref PrivateRouteTable
-      SubnetId: !Ref PrivateSubnet1
 
-  # Security Groups
+  # Security Group for VPC
   DefaultSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub '${VpcName}-default-sg-${Environment}'
-      GroupDescription: Default security group for LCPL VPC
+      GroupName: !Sub '${VpcName}-default-sg-${Environment}-${AWS::StackId}'
+      GroupDescription: Default security group for VPC
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: -1
-          SourceSecurityGroupId: !Ref DefaultSecurityGroup
-          Description: Allow all traffic within security group
+          CidrIp: 10.0.0.0/20
+          Description: Allow all traffic within VPC
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
           Description: Allow all outbound traffic
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-default-sg-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-default-sg-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
 
-  # VPC Endpoints for AWS Services (for private subnet access)
-  S3Endpoint:
+  # VPC Endpoint for S3
+  S3VPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref VPC
@@ -213,17 +215,17 @@ Resources:
               - s3:GetObject
               - s3:PutObject
               - s3:DeleteObject
-              - s3:ListBucket
             Resource: '*'
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-s3-endpoint-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-s3-endpoint-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
 
-  DynamoDBEndpoint:
+  # VPC Endpoint for DynamoDB
+  DynamoDBVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref VPC
@@ -246,51 +248,51 @@ Resources:
             Resource: '*'
       Tags:
         - Key: Name
-          Value: !Sub '${VpcName}-dynamodb-endpoint-${Environment}'
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub '${VpcName}-dynamodb-endpoint-${Environment}-${AWS::StackId}'
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
 
 Outputs:
   VpcId:
     Description: VPC ID
     Value: !Ref VPC
     Export:
-      Name: !Sub '${ProjectName}-${Environment}-VpcId'
-
+      Name: !Sub '${ProjectName}-VpcId-${Environment}-${AWS::StackId}'
+  
   VpcCidrBlock:
     Description: VPC CIDR Block
     Value: !GetAtt VPC.CidrBlock
     Export:
-      Name: !Sub '${ProjectName}-${Environment}-VpcCidrBlock'
-
+      Name: !Sub '${ProjectName}-VpcCidrBlock-${Environment}-${AWS::StackId}'
+  
   PublicSubnetId:
     Description: Public Subnet ID (Single AZ for cost optimization)
-    Value: !Ref PublicSubnet1
+    Value: !Ref PublicSubnet
     Export:
-      Name: !Sub '${ProjectName}-${Environment}-PublicSubnetId'
-
+      Name: !Sub '${ProjectName}-PublicSubnetId-${Environment}-${AWS::StackId}'
+  
   PrivateSubnetId:
     Description: Private Subnet ID (Single AZ for cost optimization)
-    Value: !Ref PrivateSubnet1
+    Value: !Ref PrivateSubnet
     Export:
-      Name: !Sub '${ProjectName}-${Environment}-PrivateSubnetId'
-
-  NatGatewayId:
-    Description: NAT Gateway ID (Single AZ for cost optimization)
-    Value: !Ref NatGateway
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-NatGatewayId'
-
+      Name: !Sub '${ProjectName}-PrivateSubnetId-${Environment}-${AWS::StackId}'
+  
   DefaultSecurityGroupId:
     Description: Default Security Group ID
     Value: !Ref DefaultSecurityGroup
     Export:
-      Name: !Sub '${ProjectName}-${Environment}-DefaultSecurityGroupId'
-
+      Name: !Sub '${ProjectName}-DefaultSecurityGroupId-${Environment}-${AWS::StackId}'
+  
   InternetGatewayId:
     Description: Internet Gateway ID
     Value: !Ref InternetGateway
     Export:
-      Name: !Sub '${ProjectName}-${Environment}-InternetGatewayId'
+      Name: !Sub '${ProjectName}-InternetGatewayId-${Environment}-${AWS::StackId}'
+  
+  NatGatewayId:
+    Description: NAT Gateway ID
+    Value: !Ref NatGateway
+    Export:
+      Name: !Sub '${ProjectName}-NatGatewayId-${Environment}-${AWS::StackId}'
