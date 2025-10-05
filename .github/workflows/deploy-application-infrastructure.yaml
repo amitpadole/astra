@@ -60,6 +60,20 @@ jobs:
           echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
           echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}" >> $GITHUB_ENV
 
+      - name: Deploy S3 Deployment Bucket First
+        run: |
+          echo "🪣 Creating S3 deployment bucket first..."
+          aws cloudformation deploy \
+            --template-file aws-infra/cloudformation/s3-deployment.yaml \
+            --stack-name astra-deployment-bucket-$ENVIRONMENT \
+            --parameter-overrides \
+              Environment=$ENVIRONMENT \
+              ProjectName=$PROJECT_NAME \
+              AWSAccountId=$AWS_ACCOUNT_ID \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset
+          echo "✅ Deployment bucket created successfully"
+
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
         run: |
