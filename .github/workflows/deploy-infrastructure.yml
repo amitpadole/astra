@@ -39,15 +39,17 @@ jobs:
 
       - name: Set environment variables
         run: |
+          # Generate unique timestamp for stack name
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           echo "ENVIRONMENT=dev" >> $GITHUB_ENV
-          echo "STACK_NAME=astra-infrastructure-dev" >> $GITHUB_ENV
+          echo "STACK_NAME=astra-infrastructure-dev-${TIMESTAMP}" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+          echo "DEPLOYMENT_BUCKET=astra-deployments-dev-${AWS_ACCOUNT_ID}" >> $GITHUB_ENV
 
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
         run: |
           # Create deployment bucket if it doesn't exist
-          DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-${AWS_ACCOUNT_ID}"
           aws s3 mb "s3://$DEPLOYMENT_BUCKET" --region $AWS_REGION || echo "Bucket already exists"
           
           # Upload only essential templates for now
@@ -65,4 +67,18 @@ jobs:
               AWSAccountId=$AWS_ACCOUNT_ID \
             --capabilities CAPABILITY_NAMED_IAM \
             --region $AWS_REGION
+
+      - name: Clean up old stacks (optional)
+        run: |
+          # List all stacks with astra-infrastructure-dev prefix
+          OLD_STACKS=$(aws cloudformation list-stacks \
+            --query 'StackSummaries[?contains(StackName, `astra-infrastructure-dev`) && StackStatus==`CREATE_COMPLETE`].StackName' \
+            --output text)
+          
+          # Keep only the 3 most recent stacks, delete the rest
+          if [ ! -z "$OLD_STACKS" ]; then
+            echo "Found old stacks: $OLD_STACKS"
+            # This is optional - you can remove this step if you want to keep all stacks
+            echo "Note: Old stack cleanup is disabled for safety. Manual cleanup recommended."
+          fi
 
