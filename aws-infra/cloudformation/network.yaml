@@ -198,41 +198,27 @@ Outputs:
   VpcId:
     Description: VPC ID
     Value: !Ref VPC
-    Export:
-      Name: !Sub '${ProjectName}-VpcId-${Environment}'
   
   VpcCidrBlock:
     Description: VPC CIDR Block
     Value: !GetAtt VPC.CidrBlock
-    Export:
-      Name: !Sub '${ProjectName}-VpcCidrBlock-${Environment}'
   
   PublicSubnetId:
     Description: Public Subnet ID
     Value: !Ref PublicSubnet
-    Export:
-      Name: !Sub '${ProjectName}-PublicSubnetId-${Environment}'
   
   PrivateSubnetId:
     Description: Private Subnet ID
     Value: !Ref PrivateSubnet
-    Export:
-      Name: !Sub '${ProjectName}-PrivateSubnetId-${Environment}'
   
   DefaultSecurityGroupId:
     Description: Default Security Group ID
     Value: !Ref DefaultSecurityGroup
-    Export:
-      Name: !Sub '${ProjectName}-DefaultSecurityGroupId-${Environment}'
   
   InternetGatewayId:
     Description: Internet Gateway ID
     Value: !Ref InternetGateway
-    Export:
-      Name: !Sub '${ProjectName}-InternetGatewayId-${Environment}'
   
   NatGatewayId:
     Description: NAT Gateway ID
     Value: !Ref NatGateway
-    Export:
-      Name: !Sub '${ProjectName}-NatGatewayId-${Environment}'
