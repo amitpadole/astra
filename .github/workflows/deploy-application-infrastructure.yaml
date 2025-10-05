@@ -9,6 +9,7 @@ on:
       - 'aws-infra/cloudformation/network.yaml'
       - 'aws-infra/cloudformation/dynamodb.yaml'
       - 'aws-infra/cloudformation/parent.yaml'
+      - '.github/workflows/deploy-application-infrastructure.yaml'
   workflow_dispatch:
     inputs:
       environment:
