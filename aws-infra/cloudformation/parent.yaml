@@ -128,8 +128,48 @@ Resources:
 
 Outputs:
   
-  # DeploymentBucketName is managed by separate astra-deployment-bucket stack
-  # No need to export it from parent stack since it's not used by child stacks
+  # Phase 1: S3 and Network Outputs
+  InputBucketName:
+    Description: S3 bucket for input files
+    Value: !GetAtt S3Stack.Outputs.InputBucketName
+    Export:
+      Name: !Sub '${ProjectName}-InputBucket-${Environment}'
+  
+  InputBucketArn:
+    Description: S3 bucket ARN for input files
+    Value: !GetAtt S3Stack.Outputs.InputBucketArn
+    Export:
+      Name: !Sub '${ProjectName}-InputBucketArn-${Environment}'
+
+  VpcId:
+    Description: VPC ID
+    Value: !GetAtt NetworkStack.Outputs.VpcId
+    Export:
+      Name: !Sub '${ProjectName}-VpcId-${Environment}'
+  
+  VpcCidrBlock:
+    Description: VPC CIDR Block
+    Value: !GetAtt NetworkStack.Outputs.VpcCidrBlock
+    Export:
+      Name: !Sub '${ProjectName}-VpcCidrBlock-${Environment}'
+  
+  PublicSubnetId:
+    Description: Public Subnet ID
+    Value: !GetAtt NetworkStack.Outputs.PublicSubnetId
+    Export:
+      Name: !Sub '${ProjectName}-PublicSubnetId-${Environment}'
+  
+  PrivateSubnetId:
+    Description: Private Subnet ID
+    Value: !GetAtt NetworkStack.Outputs.PrivateSubnetId
+    Export:
+      Name: !Sub '${ProjectName}-PrivateSubnetId-${Environment}'
+  
+  DefaultSecurityGroupId:
+    Description: Default Security Group ID
+    Value: !GetAtt NetworkStack.Outputs.DefaultSecurityGroupId
+    Export:
+      Name: !Sub '${ProjectName}-DefaultSecurityGroupId-${Environment}'
 
   # 
   # TODO: Phase 2 - Uncomment these outputs gradually
