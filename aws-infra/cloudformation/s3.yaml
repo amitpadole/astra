@@ -61,7 +61,7 @@ Resources:
             Principal: '*'
             Action: 's3:*'
             Resource:
-              - !Sub '${InputBucket}/*'
+              - !Sub '${InputBucket.Arn}/*'
               - !GetAtt InputBucket.Arn
             Condition:
               Bool:
