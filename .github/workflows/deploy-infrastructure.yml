@@ -44,11 +44,15 @@ jobs:
           echo "ENVIRONMENT=dev" >> $GITHUB_ENV
           echo "STACK_NAME=astra-infrastructure-dev-${TIMESTAMP}" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
-          echo "DEPLOYMENT_BUCKET=astra-deployments-dev-${AWS_ACCOUNT_ID}" >> $GITHUB_ENV
 
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
         run: |
+          # Get AWS Account ID and create deployment bucket name
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-${AWS_ACCOUNT_ID}"
+          echo "Using deployment bucket: $DEPLOYMENT_BUCKET"
+          
           # Create deployment bucket if it doesn't exist
           aws s3 mb "s3://$DEPLOYMENT_BUCKET" --region $AWS_REGION || echo "Bucket already exists"
           
@@ -58,6 +62,9 @@ jobs:
 
       - name: Deploy CloudFormation stack
         run: |
+          # Get AWS Account ID for parameter overrides
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          
           aws cloudformation deploy \
             --template-file aws-infra/cloudformation/parent-simple.yaml \
             --stack-name $STACK_NAME \
