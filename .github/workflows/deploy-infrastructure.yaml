@@ -14,9 +14,7 @@ on:
   push:
     branches: [develop, main]
     paths:
-      - 'aws-infra/cloudformation/s3.yaml'
-      - 'aws-infra/cloudformation/network.yaml'
-      - 'aws-infra/cloudformation/parent.yaml'
+      - 'aws-infra/cloudformation/*'
       - '.github/workflows/deploy-infrastructure.yaml'
 
 jobs:
@@ -38,11 +36,7 @@ jobs:
             echo "❌ AWS_SECRET_ACCESS_KEY secret is missing"
             exit 1
           fi
-          if [ -z "${{ secrets.AWS_REGION }}" ]; then
-            echo "❌ AWS_REGION secret is missing"
-            echo "Please add AWS_REGION secret to GitHub repository settings"
-            exit 1
-          fi
+
           echo "✅ All required secrets are configured"
 
       - name: Configure AWS credentials
@@ -50,7 +44,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: 'us-east-1'
 
       - name: Set environment variables
         run: |
@@ -59,17 +53,6 @@ jobs:
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
           echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
           echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}-${TIMESTAMP}" >> $GITHUB_ENV
-
-      - name: Check if network infrastructure exists
-        run: |
-          echo "🔍 Checking if network infrastructure exists..."
-          if ! aws cloudformation describe-stacks --stack-name astra-network-$ENVIRONMENT --query 'Stacks[0].StackStatus' --output text 2>/dev/null; then
-            echo "❌ Network infrastructure not found. Please deploy network first."
-            echo "Run: gh workflow run deploy-network.yaml -f environment=$ENVIRONMENT"
-            exit 1
-          else
-            echo "✅ Network infrastructure found"
-          fi
 
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
