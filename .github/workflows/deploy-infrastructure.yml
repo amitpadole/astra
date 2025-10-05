@@ -45,16 +45,32 @@ jobs:
 
       - name: Upload CloudFormation templates to S3
         run: |
+          # Debug: Show current directory and file structure
+          echo "Current directory: $(pwd)"
+          echo "Contents of aws-infra/cloudformation/:"
+          ls -la aws-infra/cloudformation/
+          
           # Create deployment bucket if it doesn't exist
           DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-${AWS_ACCOUNT_ID}"
           aws s3 mb "s3://$DEPLOYMENT_BUCKET" --region $AWS_REGION || echo "Bucket already exists"
           
           # Upload child stack templates
+          echo "Uploading vpc.yaml..."
           aws s3 cp aws-infra/cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
+          
+          echo "Uploading s3.yaml..."
           aws s3 cp aws-infra/cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
+          
+          echo "Uploading dynamodb.yaml..."
           aws s3 cp aws-infra/cloudformation/dynamodb.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/dynamodb.yaml"
+          
+          echo "Uploading iam.yaml..."
           aws s3 cp aws-infra/cloudformation/iam.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/iam.yaml"
+          
+          echo "Uploading lambda.yaml..."
           aws s3 cp aws-infra/cloudformation/lambda.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/lambda.yaml"
+          
+          echo "Uploading monitoring.yaml..."
           aws s3 cp aws-infra/cloudformation/monitoring.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/monitoring.yaml"
 
       - name: Deploy CloudFormation stack
