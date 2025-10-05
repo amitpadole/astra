@@ -20,7 +20,7 @@ on:
       #- 'aws-infra/cloudformation/lambda.yaml'
       #- 'aws-infra/cloudformation/monitoring.yaml'
       - 'aws-infra/cloudformation/parent.yaml'
-      - '.github/workflows/deploy-infrastructure.yaml'
+      - '.github/workflows/deploy-application-infrastructure.yaml'
 
 jobs:
   deploy-infrastructure:
