@@ -45,25 +45,22 @@ jobs:
 
       - name: Upload CloudFormation templates to S3
         run: |
-          cd aws-infra
-          
           # Create deployment bucket if it doesn't exist
           DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-${AWS_ACCOUNT_ID}"
           aws s3 mb "s3://$DEPLOYMENT_BUCKET" --region $AWS_REGION || echo "Bucket already exists"
           
           # Upload child stack templates
-          aws s3 cp cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
-          aws s3 cp cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
-          aws s3 cp cloudformation/dynamodb.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/dynamodb.yaml"
-          aws s3 cp cloudformation/iam.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/iam.yaml"
-          aws s3 cp cloudformation/lambda.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/lambda.yaml"
-          aws s3 cp cloudformation/monitoring.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/monitoring.yaml"
+          aws s3 cp aws-infra/cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
+          aws s3 cp aws-infra/cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
+          aws s3 cp aws-infra/cloudformation/dynamodb.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/dynamodb.yaml"
+          aws s3 cp aws-infra/cloudformation/iam.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/iam.yaml"
+          aws s3 cp aws-infra/cloudformation/lambda.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/lambda.yaml"
+          aws s3 cp aws-infra/cloudformation/monitoring.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/monitoring.yaml"
 
       - name: Deploy CloudFormation stack
         run: |
-          cd aws-infra
           aws cloudformation deploy \
-            --template-file cloudformation/parent.yaml \
+            --template-file aws-infra/cloudformation/parent.yaml \
             --stack-name $STACK_NAME \
             --parameter-overrides \
               Environment=dev \
@@ -75,7 +72,6 @@ jobs:
       - name: Get stack outputs
         id: stack-outputs
         run: |
-          cd aws-infra
           
           INPUT_BUCKET=$(aws cloudformation describe-stacks \
             --stack-name $STACK_NAME \
