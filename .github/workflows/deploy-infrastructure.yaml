@@ -15,11 +15,11 @@ on:
     branches: [develop, main]
     paths:
       - 'aws-infra/cloudformation/s3.yaml'
-      - 'aws-infra/cloudformation/dynamodb.yaml'
-      - 'aws-infra/cloudformation/iam.yaml'
-      - 'aws-infra/cloudformation/lambda.yaml'
-      - 'aws-infra/cloudformation/monitoring.yaml'
-      - 'aws-infra/cloudformation/parent.yaml'
+      #- 'aws-infra/cloudformation/dynamodb.yaml'
+      #- 'aws-infra/cloudformation/iam.yaml'
+      #- 'aws-infra/cloudformation/lambda.yaml'
+      #- 'aws-infra/cloudformation/monitoring.yaml'
+      #- 'aws-infra/cloudformation/parent.yaml'
       - '.github/workflows/deploy-infrastructure.yaml'
 
 jobs:
@@ -57,7 +57,7 @@ jobs:
           echo "PROJECT_NAME=astra" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
           echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
-          echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}-${TIMESTAMP}" >> $GITHUB_ENV
+          echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}-$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
 
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
