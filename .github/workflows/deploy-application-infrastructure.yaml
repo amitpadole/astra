@@ -1,6 +1,13 @@
 name: Deploy Application Infrastructure
 
 on:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'aws-infra/cloudformation/s3.yaml'
+      - 'aws-infra/cloudformation/network.yaml'
+      - 'aws-infra/cloudformation/dynamodb.yaml'
+      - 'aws-infra/cloudformation/parent.yaml'
   workflow_dispatch:
     inputs:
       environment:
@@ -11,39 +18,15 @@ on:
         options:
           - dev
           - prod
-  push:
-    branches: [develop, main]
-    paths:
-      - 'aws-infra/cloudformation/s3.yaml'
-      - 'aws-infra/cloudformation/network.yaml'
-      #- 'aws-infra/cloudformation/dynamodb.yaml'
-      #- 'aws-infra/cloudformation/iam.yaml'
-      #- 'aws-infra/cloudformation/lambda.yaml'
-      #- 'aws-infra/cloudformation/monitoring.yaml'
-      - 'aws-infra/cloudformation/parent.yaml'
-      - '.github/workflows/deploy-application-infrastructure.yaml'
 
 jobs:
-  deploy-infrastructure:
+  deploy-dev:
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}
-    
+    environment: dev
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Validate GitHub Secrets
-        run: |
-          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
-            echo "❌ AWS_ACCESS_KEY_ID secret is missing"
-            exit 1
-          fi
-          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
-            echo "❌ AWS_SECRET_ACCESS_KEY secret is missing"
-            exit 1
-          fi
-
-          echo "✅ All required secrets are configured"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -54,7 +37,7 @@ jobs:
 
       - name: Set environment variables
         run: |
-          echo "ENVIRONMENT=${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}" >> $GITHUB_ENV
+          echo "ENVIRONMENT=dev" >> $GITHUB_ENV
           echo "PROJECT_NAME=astra" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
           echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
@@ -98,6 +81,7 @@ jobs:
           echo "📤 Uploading CloudFormation templates to S3..."
           aws s3 cp cloudformation/s3.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/s3.yaml
           aws s3 cp cloudformation/network.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/network.yaml
+          aws s3 cp cloudformation/dynamodb.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/dynamodb.yaml
           aws s3 cp cloudformation/parent.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/parent.yaml
           echo "✅ Templates uploaded successfully"
 
@@ -115,6 +99,7 @@ jobs:
             done
             echo "⏳ Waiting for stacks to be deleted..."
             for stack in $FAILED_STACKS; do
+              echo "Waiting for $stack to be deleted..."
               aws cloudformation wait stack-delete-complete --stack-name "$stack" || echo "Stack $stack deletion completed or timed out"
             done
             echo "✅ Failed stacks cleaned up"
@@ -132,17 +117,123 @@ jobs:
               Environment=$ENVIRONMENT \
               ProjectName=$PROJECT_NAME \
               AWSAccountId=$AWS_ACCOUNT_ID \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+          echo "✅ Phase 1 deployment completed successfully"
+
+      - name: Get stack outputs
+        run: |
+          echo "📋 Retrieving stack outputs..."
+          aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs' \
+            --output table || echo "No outputs available"
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: 'us-east-1'
+
+      - name: Set environment variables
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+          echo "PROJECT_NAME=astra" >> $GITHUB_ENV
+          echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+          echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+          echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}" >> $GITHUB_ENV
+
+      - name: Check if S3 deployment bucket exists
+        run: |
+          echo "🔍 Checking if S3 deployment bucket exists..."
+          BUCKET_NAME="astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID"
+          if aws s3 ls "s3://$BUCKET_NAME" 2>/dev/null; then
+            echo "✅ Deployment bucket already exists: $BUCKET_NAME"
+            echo "SKIP_DEPLOYMENT_BUCKET=true" >> $GITHUB_ENV
+          else
+            echo "❌ Deployment bucket does not exist: $BUCKET_NAME"
+            echo "SKIP_DEPLOYMENT_BUCKET=false" >> $GITHUB_ENV
+          fi
+
+      - name: Deploy S3 Deployment Bucket (if needed)
+        if: env.SKIP_DEPLOYMENT_BUCKET == 'false'
+        run: |
+          echo "🪣 Creating S3 deployment bucket..."
+          aws cloudformation deploy \
+            --template-file aws-infra/cloudformation/s3-deployment.yaml \
+            --stack-name astra-deployment-bucket-$ENVIRONMENT \
+            --parameter-overrides \
+              Environment=$ENVIRONMENT \
+              ProjectName=$PROJECT_NAME \
+              AWSAccountId=$AWS_ACCOUNT_ID \
             --capabilities CAPABILITY_IAM \
             --no-fail-on-empty-changeset
+          echo "✅ Deployment bucket created successfully"
 
-      - name: Verify Deployment
+      - name: Skip S3 Deployment Bucket (already exists)
+        if: env.SKIP_DEPLOYMENT_BUCKET == 'true'
         run: |
-          echo "✅ Phase 1 deployment completed successfully!"
-          echo "Stack Name: $STACK_NAME"
-          echo "Environment: $ENVIRONMENT"
-          echo ""
-          echo "📋 Resources Created:"
-          echo "🎯 Next Steps:"
-          echo "1. Verify resources in AWS Console"
-          echo "2. Test network connectivity"
-          echo "3. Ready for Phase 2: DynamoDB + IAM + Lambda"
+          echo "⏭️ Skipping deployment bucket creation - already exists"
+
+      - name: Upload CloudFormation templates to S3
+        working-directory: aws-infra
+        run: |
+          echo "📤 Uploading CloudFormation templates to S3..."
+          aws s3 cp cloudformation/s3.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/s3.yaml
+          aws s3 cp cloudformation/network.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/network.yaml
+          aws s3 cp cloudformation/dynamodb.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/dynamodb.yaml
+          aws s3 cp cloudformation/parent.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/parent.yaml
+          echo "✅ Templates uploaded successfully"
+
+      - name: Check for existing failed stacks
+        run: |
+          echo "🔍 Checking for existing failed stacks..."
+          FAILED_STACKS=$(aws cloudformation list-stacks --stack-status-filter ROLLBACK_COMPLETE --query "StackSummaries[?contains(StackName, 'astra-infrastructure-$ENVIRONMENT')].StackName" --output text)
+          if [ ! -z "$FAILED_STACKS" ]; then
+            echo "⚠️ Found failed stacks in ROLLBACK_COMPLETE state:"
+            echo "$FAILED_STACKS"
+            echo "🗑️ Deleting failed stacks to allow fresh deployment..."
+            for stack in $FAILED_STACKS; do
+              echo "Deleting stack: $stack"
+              aws cloudformation delete-stack --stack-name "$stack" || echo "Failed to delete $stack (may already be deleted)"
+            done
+            echo "⏳ Waiting for stacks to be deleted..."
+            for stack in $FAILED_STACKS; do
+              echo "Waiting for $stack to be deleted..."
+              aws cloudformation wait stack-delete-complete --stack-name "$stack" || echo "Stack $stack deletion completed or timed out"
+            done
+            echo "✅ Failed stacks cleaned up"
+          else
+            echo "✅ No failed stacks found"
+          fi
+
+      - name: Deploy Application Infrastructure
+        run: |
+          echo "🚀 Deploying Phase 1: S3 + Network Infrastructure..."
+          aws cloudformation deploy \
+            --template-file aws-infra/cloudformation/parent.yaml \
+            --stack-name $STACK_NAME \
+            --parameter-overrides \
+              Environment=$ENVIRONMENT \
+              ProjectName=$PROJECT_NAME \
+              AWSAccountId=$AWS_ACCOUNT_ID \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+          echo "✅ Phase 1 deployment completed successfully"
+
+      - name: Get stack outputs
+        run: |
+          echo "📋 Retrieving stack outputs..."
+          aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs' \
+            --output table || echo "No outputs available"
