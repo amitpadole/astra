@@ -53,8 +53,8 @@ jobs:
           cd aws-infra
           
           # Upload only essential templates for now
-          aws s3 cp cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
-          aws s3 cp cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
+          aws s3 cp aws-infra/cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
+          aws s3 cp aws-infra/cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
 
       - name: Deploy CloudFormation stack
         run: |
