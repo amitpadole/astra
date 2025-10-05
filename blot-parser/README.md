@@ -1,6 +1,6 @@
-# Blot Parser - Clean Architecture Implementation
+# Blot Parser - AWS Lambda Implementation
 
-A modular Python utility for parsing Excel files with automatic vendor detection and field mapping.
+A serverless Python utility for parsing Excel files with automatic vendor detection and field mapping, deployed as an AWS Lambda function.
 
 ## Architecture
 
@@ -8,63 +8,94 @@ The code follows clean code principles with single responsibility modules:
 
 ```
 blot-parser/
+├── lambda_function.py      # Lambda entry point
+├── lambda_handler.py       # S3 event handler
 ├── blot_parser.py          # Main orchestrator
 ├── field_mapper.py         # Field mapping logic
 ├── excel_processor.py     # Excel file processing
-├── vendor_detector.py     # Vendor name extraction
-├── file_manager.py        # File operations
+├── vendor_detector.py      # Vendor name extraction
+├── file_manager.py         # File operations
 ├── config.py             # Configuration settings
 ├── mappings/             # Field mapping CSV files
 │   ├── bloomberg.csv     # Bloomberg field mappings
 │   ├── platform.csv      # Platform field mappings
 │   └── generic.csv       # Generic field mappings
-├── requirements.txt      # Dependencies
-├── run_parser.sh        # Execution script
-├── Input-files/         # Excel input files
-└── Output-files/        # Generated JSON files
+├── requirements-lambda.txt # Lambda dependencies
+├── deploy-lambda.sh       # Lambda deployment script
+└── README.md             # This file
 ```
 
-## Module Responsibilities
+## AWS Integration
 
-### 🎯 Single Responsibility Principle
+### 🚀 Serverless Architecture
 
-| Module | Responsibility |
-|--------|---------------|
-| `blot_parser.py` | **Orchestration** - Coordinates all components |
-| `field_mapper.py` | **Field Mapping** - Maps vendor fields to system fields |
-| `excel_processor.py` | **Excel Processing** - Reads and cleans Excel data |
-| `vendor_detector.py` | **Vendor Detection** - Extracts vendor from filename |
-| `file_manager.py` | **File Operations** - Handles file I/O operations |
-| `config.py` | **Configuration** - Centralized settings |
+| Component | Purpose | AWS Service |
+|-----------|---------|-------------|
+| **File Upload** | Excel files uploaded to S3 | S3 Bucket |
+| **Event Trigger** | S3 upload triggers processing | S3 Event Notification |
+| **Processing** | Excel parsing and field mapping | Lambda Function |
+| **Data Storage** | Processed JSON data storage | DynamoDB Table |
+| **Monitoring** | Logs and metrics | CloudWatch |
+
+### 📊 Processing Flow
+
+1. **Excel file** uploaded to S3 Input Bucket
+2. **S3 event** triggers Lambda function
+3. **Lambda downloads** file from S3
+4. **Vendor detection** from filename
+5. **Excel processing** and data cleaning
+6. **Field mapping** using vendor-specific CSV
+7. **Data storage** in DynamoDB table
+8. **Results** available for querying
 
 ## Features
 
-- **Clean Architecture**: Modular design with single responsibilities
+- **Serverless Processing**: Automatic scaling with AWS Lambda
+- **S3 Integration**: Direct processing from S3 uploads
+- **DynamoDB Storage**: NoSQL database for processed data
 - **Automatic Vendor Detection**: Extracts vendor from filename
-- **CSV-based Field Mapping**: Vendor-specific field mappings in `mappings/` folder
-- **Generic JSON Output**: Standardized field names
-- **Error Handling**: Graceful error recovery
-- **Logging**: Comprehensive logging throughout
+- **CSV-based Field Mapping**: Vendor-specific field mappings
+- **Error Handling**: Comprehensive error recovery
+- **CloudWatch Logging**: Full observability
+
+## Deployment
+
+### Prerequisites
+
+1. **AWS Infrastructure** deployed (see `../aws-infra/`)
+2. **AWS CLI** configured with appropriate permissions
+3. **Python 3.11+** installed
+4. **Environment file** (`.env`) created by infrastructure deployment
+
+### Step 1: Deploy Infrastructure
+
+```bash
+# Deploy shared AWS infrastructure first
+cd ../aws-infra
+./deploy-infrastructure.sh dev us-east-1
+```
+
+### Step 2: Deploy Lambda Function
+
+```bash
+# Deploy the blot-parser Lambda function
+./deploy-lambda.sh
+```
 
 ## Usage
 
-### Command Line
+### File Upload
+
+Upload Excel files to the S3 Input Bucket:
+
 ```bash
-./run_parser.sh
+# Upload file to S3
+aws s3 cp bloomberg-trade-data.xlsx s3://blot-parser-input-dev-123456789/
+
+# File will be automatically processed by Lambda
 ```
 
-### Python API
-```python
-from blot_parser import BlotParser
-
-# Initialize parser
-parser = BlotParser()
-
-# Process all files
-parser.run()
-```
-
-## File Naming Convention
+### File Naming Convention
 
 The parser extracts vendor name from filename:
 
@@ -74,7 +105,7 @@ reuters_market_data.xlsx     → vendor: "reuters"
 refinitiv.fixed.income.xlsx   → vendor: "refinitiv"
 ```
 
-## CSV Mapping Format
+### CSV Mapping Format
 
 Field mappings are stored in the `mappings/` directory:
 
@@ -94,64 +125,150 @@ Security,security_name,Security name
 BrkrName,broker_name,Broker name
 ```
 
-## Example Output
+## Data Output
 
-### Input Excel (Bloomberg format)
-| Status | Security | BrkrName | Qty_M | Price |
-|--------|----------|----------|-------|-------|
-| Accepted | Bond Name | Broker Ltd | 500 | 99.35 |
+### DynamoDB Schema
 
-### Output JSON (Generic format)
+Processed data is stored in DynamoDB with the following structure:
+
 ```json
-[
-  {
-    "trade_status": "Accepted",
-    "security_name": "Bond Name", 
-    "broker_name": "Broker Ltd",
-    "quantity": 500,
-    "price": 99.35,
-    "file_name": "bloomberg-trade-data.xlsx"
-  }
-]
+{
+  "id": "bloomberg_trade-data.xlsx_0",
+  "source_file": "bloomberg-trade-data.xlsx",
+  "vendor": "bloomberg",
+  "processed_at": "2025-10-05T10:30:00Z",
+  "trade_status": "Accepted",
+  "security_name": "Bond Name",
+  "broker_name": "Broker Ltd",
+  "quantity": 500,
+  "price": 99.35,
+  "file_name": "bloomberg-trade-data.xlsx"
+}
+```
+
+### Querying Data
+
+```bash
+# Query by vendor
+aws dynamodb query \
+  --table-name blot-parser-data-dev \
+  --index-name VendorIndex \
+  --key-condition-expression "vendor = :v" \
+  --expression-attribute-values '{":v": {"S": "bloomberg"}}'
+
+# Scan all records
+aws dynamodb scan \
+  --table-name blot-parser-data-dev
+```
+
+## Monitoring
+
+### CloudWatch Logs
+
+```bash
+# View Lambda logs
+aws logs tail /aws/lambda/blot-parser-dev --follow
+
+# Filter for errors
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/blot-parser-dev \
+  --filter-pattern "ERROR"
+```
+
+### Metrics
+
+- **Invocation Count**: Number of Lambda invocations
+- **Duration**: Processing time per file
+- **Error Rate**: Failed processing percentage
+- **DynamoDB Metrics**: Read/Write capacity usage
+
+## Configuration
+
+### Environment Variables
+
+Set by infrastructure deployment:
+
+```bash
+DYNAMODB_TABLE_NAME=blot-parser-data-dev
+S3_BUCKET=blot-parser-input-dev-123456789
+AWS_REGION=us-east-1
+```
+
+### Lambda Settings
+
+- **Runtime**: Python 3.11
+- **Memory**: 512 MB
+- **Timeout**: 5 minutes
+- **Handler**: `lambda_function.lambda_handler`
+
+## Error Handling
+
+### Common Issues
+
+1. **Lambda Timeout**: Increase timeout for large files
+2. **Memory Issues**: Increase memory allocation
+3. **Permission Errors**: Check IAM role permissions
+4. **S3 Trigger Not Working**: Verify bucket notification
+
+### Debugging
+
+```bash
+# Test Lambda function directly
+aws lambda invoke \
+  --function-name blot-parser-dev \
+  --payload '{"Records":[{"s3":{"bucket":{"name":"test-bucket"},"object":{"key":"test.xlsx"}}}]}' \
+  response.json
+
+# Check DynamoDB for processed data
+aws dynamodb scan --table-name blot-parser-data-dev --max-items 10
 ```
 
 ## Adding New Vendors
 
-1. **Create CSV mapping file**: `mappings/[vendor].csv`
+1. **Create CSV mapping**: `mappings/[vendor].csv`
 2. **Use standard format**: `vendor_field,system_field,description`
 3. **Name files with vendor prefix**: `[vendor]-data.xlsx`
+4. **Upload to S3**: File will be automatically processed
 
-The parser will automatically:
-- Detect vendor from filename
-- Load appropriate CSV mapping from `mappings/` folder
-- Apply field transformations
-- Generate generic JSON output
+## Cost Optimization
 
-## Error Handling
+### Lambda Optimization
 
-- **Missing CSV**: Logs error, keeps original field names
-- **Invalid Excel**: Skips file, reports error
-- **No vendor detected**: Uses filename as vendor name
+- **Memory**: Right-size based on file size
+- **Timeout**: Set appropriate timeout
+- **Concurrency**: Control concurrent executions
 
-## Setup
+### DynamoDB Optimization
+
+- **On-Demand Billing**: Pay per request
+- **TTL**: Automatic cleanup of old records
+- **Indexes**: Optimize for query patterns
+
+## Security
+
+### IAM Permissions
+
+- **S3 Access**: Read from input bucket only
+- **DynamoDB Access**: Write to data table only
+- **CloudWatch Logs**: Write logs
+- **Least Privilege**: Minimal required permissions
+
+### Data Protection
+
+- **Encryption**: All data encrypted at rest
+- **VPC**: Can be configured for private access
+- **Access Logs**: All access logged
+
+## Cleanup
+
+To remove the Lambda function:
 
 ```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+# Delete Lambda function
+aws lambda delete-function --function-name blot-parser-dev
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Run parser
-./run_parser.sh
+# Remove S3 trigger
+aws s3api put-bucket-notification-configuration \
+  --bucket blot-parser-input-dev-123456789 \
+  --notification-configuration '{}'
 ```
-
-## Code Quality
-
-- **Single Responsibility**: Each module has one clear purpose
-- **Clean Code**: Readable, maintainable, and efficient
-- **Error Handling**: Comprehensive error recovery
-- **Logging**: Detailed logging for debugging
-- **Type Hints**: Full type annotation support
-- **Documentation**: Clear docstrings and comments
