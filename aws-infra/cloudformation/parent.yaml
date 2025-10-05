@@ -128,12 +128,8 @@ Resources:
 
 Outputs:
   
-  DeploymentBucketName:
-    Description: S3 bucket for Lambda deployments
-    Value: !ImportValue
-      Fn::Sub: '${ProjectName}-DeploymentBucket-${Environment}'
-    Export:
-      Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}'
+  # DeploymentBucketName is managed by separate astra-deployment-bucket stack
+  # No need to export it from parent stack since it's not used by child stacks
 
   # 
   # TODO: Phase 2 - Uncomment these outputs gradually
