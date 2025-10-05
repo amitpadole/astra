@@ -60,9 +60,22 @@ jobs:
           echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
           echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}" >> $GITHUB_ENV
 
-      - name: Deploy S3 Deployment Bucket First
+      - name: Check if S3 deployment bucket exists
         run: |
-          echo "🪣 Creating S3 deployment bucket first..."
+          echo "🔍 Checking if S3 deployment bucket exists..."
+          BUCKET_NAME="astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID"
+          if aws s3 ls "s3://$BUCKET_NAME" 2>/dev/null; then
+            echo "✅ Deployment bucket already exists: $BUCKET_NAME"
+            echo "SKIP_DEPLOYMENT_BUCKET=true" >> $GITHUB_ENV
+          else
+            echo "❌ Deployment bucket does not exist: $BUCKET_NAME"
+            echo "SKIP_DEPLOYMENT_BUCKET=false" >> $GITHUB_ENV
+          fi
+
+      - name: Deploy S3 Deployment Bucket (if needed)
+        if: env.SKIP_DEPLOYMENT_BUCKET == 'false'
+        run: |
+          echo "🪣 Creating S3 deployment bucket..."
           aws cloudformation deploy \
             --template-file aws-infra/cloudformation/s3-deployment.yaml \
             --stack-name astra-deployment-bucket-$ENVIRONMENT \
@@ -73,6 +86,11 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --no-fail-on-empty-changeset
           echo "✅ Deployment bucket created successfully"
+
+      - name: Skip S3 Deployment Bucket (already exists)
+        if: env.SKIP_DEPLOYMENT_BUCKET == 'true'
+        run: |
+          echo "⏭️ Skipping deployment bucket creation - already exists"
 
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
