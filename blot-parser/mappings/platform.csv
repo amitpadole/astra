@@ -1,0 +1,46 @@
+vendor_field,system_field,description
+Status,trade_status,Trade status (Accepted, Rejected, etc.)
+Alloc Status,allocation_status,Allocation status
+Ord/Inq,order_type,Order or inquiry type
+Security,security_name,Full security name/description
+SecDesc,security_description,Security description
+ISIN,isin,International Securities Identification Number
+Cusip,cusip,Committee on Uniform Securities Identification Procedures
+Ticker,ticker,Security ticker symbol
+Side,trade_side,Trade side (Buy/Sell)
+Qty_M,quantity,Trade quantity
+Price,price,Trade price
+Yield,yield,Security yield
+Settl Money,settlement_amount,Settlement amount
+Acc Int,accrued_interest,Accrued interest
+Net,net_amount,Net amount
+Acc Days Settl,accrued_days_settlement,Accrued days to settlement
+Trade Dt,trade_date,Trade date
+SetDt,settlement_date,Settlement date
+Cover Time,cover_time,Cover time
+VCON Confirmed Time,confirmed_time,VCON confirmed timestamp
+VCON Sent Time,sent_time,VCON sent timestamp
+Dlr Firm Time,dealer_firm_time,Dealer firm time
+Customer,customer,Customer name
+BrkrName,broker_name,Broker name
+Brkr,broker,Broker identifier
+Dlr Alias,dealer_alias,Dealer alias
+UserName,user_name,User name
+Platform,platform,Trading platform
+App,application,Application name
+Seq#,sequence_number,Sequence number
+TimerDesc,timer_description,Timer description
+Dlr Resp,dealer_response,Dealer response
+ID,trade_id,Trade identifier
+VCON Trade ID,platform_trade_id,VCON trade identifier
+Base Curncy,base_currency,Base currency
+All-In,all_in_price,All-in price
+Firm Spread,firm_spread,Firm spread
+G Spread,g_spread,G-spread
+Prin Exch,principal_exchange,Principal exchange
+Issue Cntry,issue_country,Issue country
+AllocDlrMapAcc,allocation_dealer_mapping_account,Allocation dealer mapping account
+GrpAcpt,group_acceptance,Group acceptance
+AllocBlpId,allocation_bloomberg_id,Allocation Bloomberg ID
+AllocInvID,allocation_investor_id,Allocation investor ID
+Account,account,Account identifier
