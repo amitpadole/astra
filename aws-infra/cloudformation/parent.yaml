@@ -130,7 +130,8 @@ Outputs:
   
   DeploymentBucketName:
     Description: S3 bucket for Lambda deployments
-    Value: !GetAtt S3Stack.Outputs.DeploymentBucketName
+    Value: !ImportValue
+      Fn::Sub: '${ProjectName}-DeploymentBucket-${Environment}'
     Export:
       Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}'
 
