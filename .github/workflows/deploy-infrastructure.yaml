@@ -68,6 +68,27 @@ jobs:
           aws s3 cp cloudformation/parent.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/parent.yaml
           echo "✅ Templates uploaded successfully"
 
+      - name: Check for existing failed stacks
+        run: |
+          echo "🔍 Checking for existing failed stacks..."
+          FAILED_STACKS=$(aws cloudformation list-stacks --stack-status-filter ROLLBACK_COMPLETE --query "StackSummaries[?contains(StackName, 'astra-infrastructure-$ENVIRONMENT')].StackName" --output text)
+          if [ ! -z "$FAILED_STACKS" ]; then
+            echo "⚠️ Found failed stacks in ROLLBACK_COMPLETE state:"
+            echo "$FAILED_STACKS"
+            echo "🗑️ Deleting failed stacks to allow fresh deployment..."
+            for stack in $FAILED_STACKS; do
+              echo "Deleting stack: $stack"
+              aws cloudformation delete-stack --stack-name "$stack" || echo "Failed to delete $stack (may already be deleted)"
+            done
+            echo "⏳ Waiting for stacks to be deleted..."
+            for stack in $FAILED_STACKS; do
+              aws cloudformation wait stack-delete-complete --stack-name "$stack" || echo "Stack $stack deletion completed or timed out"
+            done
+            echo "✅ Failed stacks cleaned up"
+          else
+            echo "✅ No failed stacks found"
+          fi
+
       - name: Deploy Application Infrastructure
         run: |
           echo "🚀 Deploying Phase 1: S3 + Network Infrastructure..."

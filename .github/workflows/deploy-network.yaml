@@ -63,6 +63,27 @@ jobs:
           echo "📤 Uploading network template to S3..."
           aws s3 cp cloudformation/network.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/network.yaml
 
+      - name: Check for existing failed network stacks
+        run: |
+          echo "🔍 Checking for existing failed network stacks..."
+          FAILED_STACKS=$(aws cloudformation list-stacks --stack-status-filter ROLLBACK_COMPLETE --query "StackSummaries[?contains(StackName, 'astra-network-$ENVIRONMENT')].StackName" --output text)
+          if [ ! -z "$FAILED_STACKS" ]; then
+            echo "⚠️ Found failed network stacks in ROLLBACK_COMPLETE state:"
+            echo "$FAILED_STACKS"
+            echo "🗑️ Deleting failed stacks to allow fresh deployment..."
+            for stack in $FAILED_STACKS; do
+              echo "Deleting stack: $stack"
+              aws cloudformation delete-stack --stack-name "$stack" || echo "Failed to delete $stack (may already be deleted)"
+            done
+            echo "⏳ Waiting for stacks to be deleted..."
+            for stack in $FAILED_STACKS; do
+              aws cloudformation wait stack-delete-complete --stack-name "$stack" || echo "Stack $stack deletion completed or timed out"
+            done
+            echo "✅ Failed network stacks cleaned up"
+          else
+            echo "✅ No failed network stacks found"
+          fi
+
       - name: Deploy Network Infrastructure
         run: |
           echo "🚀 Deploying network infrastructure..."
