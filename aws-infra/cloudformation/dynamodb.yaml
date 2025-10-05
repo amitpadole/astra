@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'DynamoDB Resources for Blot Parser - Data storage table'
+Description: 'DynamoDB Resources for Astra - Trade data storage with optimized query patterns'
 
 Parameters:
   Environment:
@@ -11,37 +11,51 @@ Parameters:
     Description: Project name for resource naming
 
 Resources:
-  # DynamoDB Table for processed data
+  # DynamoDB Table for processed trade data
   DataTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub '${ProjectName}-data-${Environment}'
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: file_name
           AttributeType: S
-        - AttributeName: vendor
+        - AttributeName: sent_time
+          AttributeType: S
+        - AttributeName: trade_id
+          AttributeType: S
+        - AttributeName: platform
+          AttributeType: S
+        - AttributeName: trade_status
           AttributeType: S
         - AttributeName: processed_at
           AttributeType: S
-        - AttributeName: source_file
-          AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: file_name
           KeyType: HASH
+        - AttributeName: sent_time
+          KeyType: RANGE
       GlobalSecondaryIndexes:
-        - IndexName: VendorIndex
+        - IndexName: TradeIdIndex
           KeySchema:
-            - AttributeName: vendor
+            - AttributeName: trade_id
               KeyType: HASH
-            - AttributeName: processed_at
+            - AttributeName: sent_time
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-        - IndexName: SourceFileIndex
+        - IndexName: PlatformStatusIndex
           KeySchema:
-            - AttributeName: source_file
+            - AttributeName: platform
               KeyType: HASH
+            - AttributeName: trade_status
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ProcessedAtIndex
+          KeySchema:
             - AttributeName: processed_at
+              KeyType: HASH
+            - AttributeName: sent_time
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
@@ -59,29 +73,41 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: Purpose
-          Value: DataStorage
+          Value: TradeDataStorage
 
-  # DynamoDB Table for processing status
+  # DynamoDB Table for file processing status
   StatusTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub '${ProjectName}-status-${Environment}'
       AttributeDefinitions:
-        - AttributeName: file_id
+        - AttributeName: file_name
+          AttributeType: S
+        - AttributeName: processed_at
           AttributeType: S
         - AttributeName: status
           AttributeType: S
-        - AttributeName: created_at
+        - AttributeName: vendor
           AttributeType: S
       KeySchema:
-        - AttributeName: file_id
+        - AttributeName: file_name
           KeyType: HASH
+        - AttributeName: processed_at
+          KeyType: RANGE
       GlobalSecondaryIndexes:
         - IndexName: StatusIndex
           KeySchema:
             - AttributeName: status
               KeyType: HASH
-            - AttributeName: created_at
+            - AttributeName: processed_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: VendorIndex
+          KeySchema:
+            - AttributeName: vendor
+              KeyType: HASH
+            - AttributeName: processed_at
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
@@ -103,25 +129,17 @@ Resources:
 
 Outputs:
   DataTableName:
-    Description: DynamoDB table for processed data
+    Description: DynamoDB table for processed trade data
     Value: !Ref DataTable
-    Export:
-      Name: !Sub '${ProjectName}-DataTable-${Environment}'
   
   DataTableArn:
-    Description: DynamoDB table ARN for processed data
+    Description: DynamoDB table ARN for processed trade data
     Value: !GetAtt DataTable.Arn
-    Export:
-      Name: !Sub '${ProjectName}-DataTableArn-${Environment}'
   
   StatusTableName:
-    Description: DynamoDB table for processing status
+    Description: DynamoDB table for file processing status
     Value: !Ref StatusTable
-    Export:
-      Name: !Sub '${ProjectName}-StatusTable-${Environment}'
   
   StatusTableArn:
-    Description: DynamoDB table ARN for processing status
+    Description: DynamoDB table ARN for file processing status
     Value: !GetAtt StatusTable.Arn
-    Export:
-      Name: !Sub '${ProjectName}-StatusTableArn-${Environment}'
