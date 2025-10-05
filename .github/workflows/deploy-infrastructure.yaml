@@ -48,14 +48,6 @@ jobs:
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
         run: |
-          echo "PWD: $(pwd)"
-          echo "Listing aws-infra:"
-          ls -la
-          echo "Listing aws-infra/cloudformation:"
-          ls -la cloudformation || true
-          echo "Show any yaml files:"
-          find . -maxdepth 3 -type f -name "*.yml" -o -name "*.yaml" -ls || true
-
           # Get AWS Account ID and create deployment bucket name
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-${AWS_ACCOUNT_ID}"
@@ -74,7 +66,7 @@ jobs:
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           
           aws cloudformation deploy \
-            --template-file aws-infra/cloudformation/parent-simple.yaml \
+            --template-file aws-infra/cloudformation/parent.yaml \
             --stack-name $STACK_NAME \
             --parameter-overrides \
               Environment=dev \

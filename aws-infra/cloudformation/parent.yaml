@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Parent CloudFormation Stack for Blot Parser - Orchestrates child stacks'
+Description: 'Parent CloudFormation Stack for Astra - Orchestrates child stacks'
 
 Parameters:
   Environment:
@@ -10,7 +10,7 @@ Parameters:
   
   ProjectName:
     Type: String
-    Default: blot-parser
+    Default: astra
     Description: Project name for resource naming
   
   AWSAccountId:
@@ -51,72 +51,72 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-  # DynamoDB Resources Stack
-  DynamoDBStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn: S3Stack
-    Properties:
-      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/dynamodb.yaml'
-      Parameters:
-        Environment: !Ref Environment
-        ProjectName: !Ref ProjectName
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
+  # DynamoDB Resources Stack (commented out - not needed for initial deployment)
+  # DynamoDBStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   DependsOn: S3Stack
+  #   Properties:
+  #     TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/dynamodb.yaml'
+  #     Parameters:
+  #       Environment: !Ref Environment
+  #       ProjectName: !Ref ProjectName
+  #     Tags:
+  #       - Key: Project
+  #         Value: !Ref ProjectName
+  #       - Key: Environment
+  #         Value: !Ref Environment
 
-  # IAM Resources Stack
-  IAMStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn: [S3Stack, DynamoDBStack]
-    Properties:
-      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/iam.yaml'
-      Parameters:
-        Environment: !Ref Environment
-        ProjectName: !Ref ProjectName
-        S3InputBucket: !GetAtt S3Stack.Outputs.InputBucketName
-        DynamoDBTableArn: !GetAtt DynamoDBStack.Outputs.DataTableArn
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
+  # IAM Resources Stack (commented out - not needed for initial deployment)
+  # IAMStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   DependsOn: [S3Stack, DynamoDBStack]
+  #   Properties:
+  #     TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/iam.yaml'
+  #     Parameters:
+  #       Environment: !Ref Environment
+  #       ProjectName: !Ref ProjectName
+  #       S3InputBucket: !GetAtt S3Stack.Outputs.InputBucketName
+  #       DynamoDBTableArn: !GetAtt DynamoDBStack.Outputs.DataTableArn
+  #     Tags:
+  #       - Key: Project
+  #         Value: !Ref ProjectName
+  #       - Key: Environment
+  #         Value: !Ref Environment
 
-  # Lambda Resources Stack
-  LambdaStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn: [S3Stack, DynamoDBStack, IAMStack]
-    Properties:
-      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/lambda.yaml'
-      Parameters:
-        Environment: !Ref Environment
-        ProjectName: !Ref ProjectName
-        S3InputBucket: !GetAtt S3Stack.Outputs.InputBucketName
-        DynamoDBTableName: !GetAtt DynamoDBStack.Outputs.DataTableName
-        LambdaRoleArn: !GetAtt IAMStack.Outputs.LambdaRoleArn
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
+  # Lambda Resources Stack (commented out - not needed for initial deployment)
+  # LambdaStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   DependsOn: [S3Stack, DynamoDBStack, IAMStack]
+  #   Properties:
+  #     TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/lambda.yaml'
+  #     Parameters:
+  #       Environment: !Ref Environment
+  #       ProjectName: !Ref ProjectName
+  #       S3InputBucket: !GetAtt S3Stack.Outputs.InputBucketName
+  #       DynamoDBTableName: !GetAtt DynamoDBStack.Outputs.DataTableName
+  #       LambdaRoleArn: !GetAtt IAMStack.Outputs.LambdaRoleArn
+  #     Tags:
+  #       - Key: Project
+  #         Value: !Ref ProjectName
+  #       - Key: Environment
+  #         Value: !Ref Environment
 
-  # Monitoring Resources Stack
-  MonitoringStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn: [LambdaStack, DynamoDBStack]
-    Properties:
-      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/monitoring.yaml'
-      Parameters:
-        Environment: !Ref Environment
-        ProjectName: !Ref ProjectName
-        LambdaFunctionName: !GetAtt LambdaStack.Outputs.LambdaFunctionName
-        DynamoDBTableName: !GetAtt DynamoDBStack.Outputs.DataTableName
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
+  # Monitoring Resources Stack (commented out - not needed for initial deployment)
+  # MonitoringStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   DependsOn: [LambdaStack, DynamoDBStack]
+  #   Properties:
+  #     TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/monitoring.yaml'
+  #     Parameters:
+  #       Environment: !Ref Environment
+  #       ProjectName: !Ref ProjectName
+  #       LambdaFunctionName: !GetAtt LambdaStack.Outputs.LambdaFunctionName
+  #       DynamoDBTableName: !GetAtt DynamoDBStack.Outputs.DataTableName
+  #     Tags:
+  #       - Key: Project
+  #         Value: !Ref ProjectName
+  #       - Key: Environment
+  #         Value: !Ref Environment
 
 Outputs:
   # VPC Outputs
@@ -162,43 +162,43 @@ Outputs:
     Value: !GetAtt S3Stack.Outputs.DeploymentBucketName
     Export:
       Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}'
+
+  # DynamoDB Outputs (commented out - not needed for initial deployment)
+  # DataTableName:
+  #   Description: DynamoDB table for processed data
+  #   Value: !GetAtt DynamoDBStack.Outputs.DataTableName
+  #   Export:
+  #     Name: !Sub '${ProjectName}-DataTable-${Environment}'
   
-  # DynamoDB Outputs
-  DataTableName:
-    Description: DynamoDB table for processed data
-    Value: !GetAtt DynamoDBStack.Outputs.DataTableName
-    Export:
-      Name: !Sub '${ProjectName}-DataTable-${Environment}'
+  # DataTableArn:
+  #   Description: DynamoDB table ARN
+  #   Value: !GetAtt DynamoDBStack.Outputs.DataTableArn
+  #   Export:
+  #     Name: !Sub '${ProjectName}-DataTableArn-${Environment}'
   
-  DataTableArn:
-    Description: DynamoDB table ARN
-    Value: !GetAtt DynamoDBStack.Outputs.DataTableArn
-    Export:
-      Name: !Sub '${ProjectName}-DataTableArn-${Environment}'
+  # IAM Outputs (commented out - not needed for initial deployment)
+  # LambdaRoleArn:
+  #   Description: IAM role ARN for Lambda functions
+  #   Value: !GetAtt IAMStack.Outputs.LambdaRoleArn
+  #   Export:
+  #     Name: !Sub '${ProjectName}-LambdaRole-${Environment}'
   
-  # IAM Outputs
-  LambdaRoleArn:
-    Description: IAM role ARN for Lambda functions
-    Value: !GetAtt IAMStack.Outputs.LambdaRoleArn
-    Export:
-      Name: !Sub '${ProjectName}-LambdaRole-${Environment}'
+  # Lambda Outputs (commented out - not needed for initial deployment)
+  # LambdaFunctionName:
+  #   Description: Lambda function name
+  #   Value: !GetAtt LambdaStack.Outputs.LambdaFunctionName
+  #   Export:
+  #     Name: !Sub '${ProjectName}-LambdaFunction-${Environment}'
   
-  # Lambda Outputs
-  LambdaFunctionName:
-    Description: Lambda function name
-    Value: !GetAtt LambdaStack.Outputs.LambdaFunctionName
-    Export:
-      Name: !Sub '${ProjectName}-LambdaFunction-${Environment}'
+  # LambdaFunctionArn:
+  #   Description: Lambda function ARN
+  #   Value: !GetAtt LambdaStack.Outputs.LambdaFunctionArn
+  #   Export:
+  #     Name: !Sub '${ProjectName}-LambdaFunctionArn-${Environment}'
   
-  LambdaFunctionArn:
-    Description: Lambda function ARN
-    Value: !GetAtt LambdaStack.Outputs.LambdaFunctionArn
-    Export:
-      Name: !Sub '${ProjectName}-LambdaFunctionArn-${Environment}'
-  
-  # Monitoring Outputs
-  CloudWatchDashboardUrl:
-    Description: CloudWatch Dashboard URL
-    Value: !GetAtt MonitoringStack.Outputs.DashboardUrl
-    Export:
-      Name: !Sub '${ProjectName}-Dashboard-${Environment}'
+  # Monitoring Outputs (commented out - not needed for initial deployment)
+  # CloudWatchDashboardUrl:
+  #   Description: CloudWatch Dashboard URL
+  #   Value: !GetAtt MonitoringStack.Outputs.DashboardUrl
+  #   Export:
+  #     Name: !Sub '${ProjectName}-Dashboard-${Environment}'
