@@ -63,7 +63,7 @@ jobs:
           aws s3 cp cloudformation/parent.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/parent.yaml
           echo "✅ Templates uploaded successfully"
 
-      - name: Deploy Application Infrastructure (Phase 1: S3 + Network)
+      - name: Deploy Application Infrastructure
         run: |
           echo "🚀 Deploying Phase 1: S3 + Network Infrastructure..."
           aws cloudformation deploy \

@@ -36,11 +36,6 @@ jobs:
             echo "❌ AWS_SECRET_ACCESS_KEY secret is missing"
             exit 1
           fi
-          if [ -z "${{ secrets.AWS_REGION }}" ]; then
-            echo "❌ AWS_REGION secret is missing"
-            echo "Please add AWS_REGION secret to GitHub repository settings"
-            exit 1
-          fi
           echo "✅ All required secrets are configured"
 
       - name: Configure AWS credentials
@@ -48,7 +43,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: 'us-east-1'
 
       - name: Set environment variables
         run: |
@@ -60,7 +55,7 @@ jobs:
       - name: Create S3 deployment bucket
         run: |
           echo "🪣 Creating S3 deployment bucket..."
-          aws s3 mb s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID --region ${{ secrets.AWS_REGION }} || echo "Bucket may already exist"
+          aws s3 mb s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID --region us-east-1 || echo "Bucket may already exist"
 
       - name: Upload CloudFormation template to S3
         working-directory: aws-infra
