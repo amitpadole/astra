@@ -26,6 +26,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate GitHub Secrets
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "❌ AWS_ACCESS_KEY_ID secret is missing"
+            exit 1
+          fi
+          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "❌ AWS_SECRET_ACCESS_KEY secret is missing"
+            exit 1
+          fi
+          if [ -z "${{ secrets.AWS_REGION }}" ]; then
+            echo "❌ AWS_REGION secret is missing"
+            echo "Please add AWS_REGION secret to GitHub repository settings"
+            exit 1
+          fi
+          echo "✅ All required secrets are configured"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -40,13 +57,20 @@ jobs:
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
           echo "STACK_NAME=astra-network-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}" >> $GITHUB_ENV
 
+      - name: Create S3 deployment bucket
+        run: |
+          echo "🪣 Creating S3 deployment bucket..."
+          aws s3 mb s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID --region ${{ secrets.AWS_REGION }} || echo "Bucket may already exist"
+
       - name: Upload CloudFormation template to S3
         working-directory: aws-infra
         run: |
+          echo "📤 Uploading network template to S3..."
           aws s3 cp cloudformation/network.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/network.yaml
 
       - name: Deploy Network Infrastructure
         run: |
+          echo "🚀 Deploying network infrastructure..."
           aws cloudformation deploy \
             --template-file aws-infra/cloudformation/network.yaml \
             --stack-name $STACK_NAME \
@@ -67,3 +91,8 @@ jobs:
           echo "Public Subnet: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`PublicSubnetId`].OutputValue' --output text)"
           echo "Private Subnet: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnetId`].OutputValue' --output text)"
           echo "Security Group: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`DefaultSecurityGroupId`].OutputValue' --output text)"
+          echo ""
+          echo "🎯 Next Steps:"
+          echo "1. Verify resources in AWS Console"
+          echo "2. Test network connectivity"
+          echo "3. Ready for application deployment"

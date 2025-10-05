@@ -28,6 +28,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate GitHub Secrets
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "❌ AWS_ACCESS_KEY_ID secret is missing"
+            exit 1
+          fi
+          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "❌ AWS_SECRET_ACCESS_KEY secret is missing"
+            exit 1
+          fi
+          if [ -z "${{ secrets.AWS_REGION }}" ]; then
+            echo "❌ AWS_REGION secret is missing"
+            echo "Please add AWS_REGION secret to GitHub repository settings"
+            exit 1
+          fi
+          echo "✅ All required secrets are configured"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -42,6 +59,17 @@ jobs:
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
           echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
           echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}-${TIMESTAMP}" >> $GITHUB_ENV
+
+      - name: Check if network infrastructure exists
+        run: |
+          echo "🔍 Checking if network infrastructure exists..."
+          if ! aws cloudformation describe-stacks --stack-name astra-network-$ENVIRONMENT --query 'Stacks[0].StackStatus' --output text 2>/dev/null; then
+            echo "❌ Network infrastructure not found. Please deploy network first."
+            echo "Run: gh workflow run deploy-network.yaml -f environment=$ENVIRONMENT"
+            exit 1
+          else
+            echo "✅ Network infrastructure found"
+          fi
 
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
