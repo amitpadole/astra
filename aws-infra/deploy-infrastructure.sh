@@ -43,11 +43,11 @@ DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-${ENVIRONMENT}-${AWS_ACCOUNT_ID:-
 aws s3 mb "s3://$DEPLOYMENT_BUCKET" --region $REGION 2>/dev/null || echo "Bucket $DEPLOYMENT_BUCKET already exists"
 
 # Upload child stack templates
-aws s3 cp cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml" --region $REGION
-aws s3 cp cloudformation/dynamodb.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/dynamodb.yaml" --region $REGION
-aws s3 cp cloudformation/iam.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/iam.yaml" --region $REGION
-aws s3 cp cloudformation/lambda.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/lambda.yaml" --region $REGION
-aws s3 cp cloudformation/monitoring.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/monitoring.yaml" --region $REGION
+aws s3 cp aws-infra/cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml" --region $REGION
+aws s3 cp aws-infra/cloudformation/dynamodb.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/dynamodb.yaml" --region $REGION
+aws s3 cp aws-infra/cloudformation/iam.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/iam.yaml" --region $REGION
+aws s3 cp aws-infra/cloudformation/lambda.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/lambda.yaml" --region $REGION
+aws s3 cp aws-infra/cloudformation/monitoring.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/monitoring.yaml" --region $REGION
 
 echo "✅ Child stack templates uploaded successfully!"
 
