@@ -1,0 +1,64 @@
+name: Deploy Network Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+  push:
+    branches: [main]
+    paths:
+      - 'aws-infra/cloudformation/network.yaml'
+      - '.github/workflows/deploy-network.yaml'
+
+jobs:
+  deploy-network:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Set environment variables
+        run: |
+          echo "ENVIRONMENT=${{ github.event.inputs.environment || 'prod' }}" >> $GITHUB_ENV
+          echo "PROJECT_NAME=astra" >> $GITHUB_ENV
+          echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+          echo "STACK_NAME=astra-network-${{ github.event.inputs.environment || 'prod' }}" >> $GITHUB_ENV
+
+      - name: Upload CloudFormation template to S3
+        working-directory: aws-infra
+        run: |
+          aws s3 cp cloudformation/network.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/network.yaml
+
+      - name: Deploy Network Infrastructure
+        run: |
+          aws cloudformation deploy \
+            --template-file aws-infra/cloudformation/network.yaml \
+            --stack-name $STACK_NAME \
+            --parameter-overrides \
+              Environment=$ENVIRONMENT \
+              ProjectName=$PROJECT_NAME \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Verify Network Deployment
+        run: |
+          echo "Network infrastructure deployed successfully!"
+          echo "VPC ID: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue' --output text)"
+          echo "Public Subnet: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`PublicSubnetId`].OutputValue' --output text)"
+          echo "Private Subnet: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnetId`].OutputValue' --output text)"

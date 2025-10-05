@@ -1,31 +1,29 @@
-name: Deploy Infrastructure
+name: Deploy Application Infrastructure
 
 on:
-  push:
-    branches: [ develop ]
-    paths: [ 'aws-infra/**', '.github/workflows/**' ]
-  pull_request:
-    branches: [ develop ]
-    paths: [ 'aws-infra/**', '.github/workflows/**' ]
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy'
+        description: 'Environment to deploy to'
         required: true
         default: 'dev'
         type: choice
         options:
-        - dev
-
-env:
-  AWS_REGION: us-east-1
-  PROJECT_NAME: astra
+          - dev
+          - prod
+  push:
+    branches: [develop, main]
+    paths:
+      - 'aws-infra/cloudformation/*.yaml'
+      - '.github/workflows/deploy-infrastructure.yaml'
+    paths-ignore:
+      - 'aws-infra/cloudformation/network.yaml'
 
 jobs:
-  deploy-dev:
-    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'dev'
+  deploy-infrastructure:
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,43 +33,40 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Set environment variables
         run: |
-          # Generate unique timestamp for stack name
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          echo "ENVIRONMENT=dev" >> $GITHUB_ENV
-          echo "STACK_NAME=astra-infrastructure-dev-${TIMESTAMP}" >> $GITHUB_ENV
+          echo "ENVIRONMENT=${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}" >> $GITHUB_ENV
+          echo "PROJECT_NAME=astra" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+          echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+          echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}-${TIMESTAMP}" >> $GITHUB_ENV
 
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
         run: |
-          # Get AWS Account ID and create deployment bucket name
-          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-${AWS_ACCOUNT_ID}"
-          echo "Using deployment bucket: $DEPLOYMENT_BUCKET"
-          
-          # Create deployment bucket if it doesn't exist
-          aws s3 mb "s3://$DEPLOYMENT_BUCKET" --region $AWS_REGION || echo "Bucket already exists"
-          
-          # Upload only essential templates for now
-          aws s3 cp cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
-          aws s3 cp cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
+          aws s3 cp cloudformation/s3.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/s3.yaml
+          aws s3 cp cloudformation/dynamodb.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/dynamodb.yaml
+          aws s3 cp cloudformation/iam.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/iam.yaml
+          aws s3 cp cloudformation/lambda.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/lambda.yaml
+          aws s3 cp cloudformation/monitoring.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/monitoring.yaml
+          aws s3 cp cloudformation/parent.yaml s3://astra-deployments-$ENVIRONMENT-$AWS_ACCOUNT_ID/cloudformation/parent.yaml
 
-      - name: Deploy CloudFormation stack
+      - name: Deploy Application Infrastructure
         run: |
-          # Get AWS Account ID for parameter overrides
-          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          
           aws cloudformation deploy \
             --template-file aws-infra/cloudformation/parent.yaml \
             --stack-name $STACK_NAME \
             --parameter-overrides \
-              Environment=dev \
+              Environment=$ENVIRONMENT \
               ProjectName=$PROJECT_NAME \
               AWSAccountId=$AWS_ACCOUNT_ID \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region $AWS_REGION
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset
 
+      - name: Verify Deployment
+        run: |
+          echo "Application infrastructure deployed successfully!"
+          echo "Stack Name: $STACK_NAME"
+          echo "Environment: $ENVIRONMENT"
