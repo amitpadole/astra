@@ -14,7 +14,8 @@ on:
   push:
     branches: [develop, main]
     paths:
-      #- 'aws-infra/cloudformation/s3.yaml'
+      - 'aws-infra/cloudformation/s3.yaml'
+      - 'aws-infra/cloudformation/network.yaml'
       #- 'aws-infra/cloudformation/dynamodb.yaml'
       #- 'aws-infra/cloudformation/iam.yaml'
       #- 'aws-infra/cloudformation/lambda.yaml'
