@@ -46,6 +46,16 @@ This directory contains the shared AWS infrastructure components for the Blot Pa
 2. **Python 3.11+** installed
 3. **pip** for dependency management
 
+### Step 0: Configure Credentials
+
+```bash
+# Set up AWS credentials and configuration
+./setup-credentials.sh
+
+# This will create credentials.env with your AWS account details
+# The file is automatically added to .gitignore for security
+```
+
 ### Step 1: Deploy Infrastructure
 
 ```bash
@@ -69,12 +79,37 @@ cd ../blot-parser
 
 ## Configuration
 
+### Credentials Management
+
+The project uses a secure credentials management system:
+
+#### **credentials.env** (Not committed to git)
+```bash
+# AWS Account Configuration
+AWS_ACCOUNT_ID=123456789012
+AWS_REGION=us-east-1
+ENVIRONMENT=dev
+
+# Project Configuration
+PROJECT_NAME=blot-parser
+STACK_NAME=blot-parser-infrastructure
+
+# Optional: AWS Access Keys (if not using AWS CLI profiles)
+# AWS_ACCESS_KEY_ID=your_access_key_here
+# AWS_SECRET_ACCESS_KEY=your_secret_key_here
+```
+
+#### **credentials.env.template** (Committed to git)
+- Template file with placeholder values
+- Safe to commit to version control
+- Users copy this to `credentials.env` and fill in real values
+
 ### Environment Variables
 
 The infrastructure deployment creates a `.env` file in each Lambda directory:
 
 ```bash
-# AWS Infrastructure Configuration
+# AWS Infrastructure Configuration (auto-generated)
 AWS_REGION=us-east-1
 INPUT_BUCKET=blot-parser-input-dev-123456789
 DATA_TABLE=blot-parser-data-dev

@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 venv/
 Output-files/
+aws-infra/credentials.env
