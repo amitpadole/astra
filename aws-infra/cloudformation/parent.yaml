@@ -21,25 +21,11 @@ Parameters:
     AllowedPattern: '^[0-9]{12}$'
 
 Resources:
-  # VPC Resources Stack
-  VPCStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub 'https://${DeploymentBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/vpc.yaml'
-      Parameters:
-        Environment: !Ref Environment
-        ProjectName: !Ref ProjectName
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-
-  # S3 Resources Stack
+  # S3 Resources Stack (must be first to create deployment bucket)
   S3Stack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://${DeploymentBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/s3.yaml'
+      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/s3.yaml'
       Parameters:
         Environment: !Ref Environment
         ProjectName: !Ref ProjectName
@@ -50,11 +36,27 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  # VPC Resources Stack (depends on S3Stack for deployment bucket)
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: S3Stack
+    Properties:
+      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/vpc.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
   # DynamoDB Resources Stack
   DynamoDBStack:
     Type: AWS::CloudFormation::Stack
+    DependsOn: S3Stack
     Properties:
-      TemplateURL: !Sub 'https://${DeploymentBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/dynamodb.yaml'
+      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/dynamodb.yaml'
       Parameters:
         Environment: !Ref Environment
         ProjectName: !Ref ProjectName
@@ -67,8 +69,9 @@ Resources:
   # IAM Resources Stack
   IAMStack:
     Type: AWS::CloudFormation::Stack
+    DependsOn: [S3Stack, DynamoDBStack]
     Properties:
-      TemplateURL: !Sub 'https://${DeploymentBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/iam.yaml'
+      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/iam.yaml'
       Parameters:
         Environment: !Ref Environment
         ProjectName: !Ref ProjectName
@@ -83,8 +86,9 @@ Resources:
   # Lambda Resources Stack
   LambdaStack:
     Type: AWS::CloudFormation::Stack
+    DependsOn: [S3Stack, DynamoDBStack, IAMStack]
     Properties:
-      TemplateURL: !Sub 'https://${DeploymentBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/lambda.yaml'
+      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/lambda.yaml'
       Parameters:
         Environment: !Ref Environment
         ProjectName: !Ref ProjectName
@@ -100,8 +104,9 @@ Resources:
   # Monitoring Resources Stack
   MonitoringStack:
     Type: AWS::CloudFormation::Stack
+    DependsOn: [LambdaStack, DynamoDBStack]
     Properties:
-      TemplateURL: !Sub 'https://${DeploymentBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/monitoring.yaml'
+      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/monitoring.yaml'
       Parameters:
         Environment: !Ref Environment
         ProjectName: !Ref ProjectName
