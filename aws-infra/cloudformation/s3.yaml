@@ -79,3 +79,15 @@ Outputs:
     Value: !GetAtt InputBucket.Arn
     Export:
       Name: !Sub '${ProjectName}-InputBucketArn-${Environment}'
+  
+  DeploymentBucketName:
+    Description: S3 bucket for Lambda deployments
+    Value: !Ref DeploymentBucket
+    Export:
+      Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}'
+  
+  DeploymentBucketArn:
+    Description: S3 bucket ARN for deployments
+    Value: !GetAtt DeploymentBucket.Arn
+    Export:
+      Name: !Sub '${ProjectName}-DeploymentBucketArn-${Environment}'
