@@ -127,12 +127,6 @@ Resources:
   #         Value: !Ref Environment
 
 Outputs:
-  # S3 Outputs
-  InputBucketName:
-    Description: S3 bucket for input files
-    Value: !GetAtt S3Stack.Outputs.InputBucketName
-    Export:
-      Name: !Sub '${ProjectName}-InputBucket-${Environment}'
   
   DeploymentBucketName:
     Description: S3 bucket for Lambda deployments
@@ -140,37 +134,7 @@ Outputs:
     Export:
       Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}'
 
-  # Network Outputs
-  VpcId:
-    Description: VPC ID
-    Value: !GetAtt NetworkStack.Outputs.VpcId
-    Export:
-      Name: !Sub '${ProjectName}-VpcId-${Environment}'
-  
-  VpcCidrBlock:
-    Description: VPC CIDR Block
-    Value: !GetAtt NetworkStack.Outputs.VpcCidrBlock
-    Export:
-      Name: !Sub '${ProjectName}-VpcCidrBlock-${Environment}'
-  
-  PublicSubnetId:
-    Description: Public Subnet ID
-    Value: !GetAtt NetworkStack.Outputs.PublicSubnetId
-    Export:
-      Name: !Sub '${ProjectName}-PublicSubnetId-${Environment}'
-  
-  PrivateSubnetId:
-    Description: Private Subnet ID
-    Value: !GetAtt NetworkStack.Outputs.PrivateSubnetId
-    Export:
-      Name: !Sub '${ProjectName}-PrivateSubnetId-${Environment}'
-  
-  DefaultSecurityGroupId:
-    Description: Default Security Group ID
-    Value: !GetAtt NetworkStack.Outputs.DefaultSecurityGroupId
-    Export:
-      Name: !Sub '${ProjectName}-DefaultSecurityGroupId-${Environment}'
-
+  # 
   # TODO: Phase 2 - Uncomment these outputs gradually
   # DynamoDB Outputs
   # DataTableName:
