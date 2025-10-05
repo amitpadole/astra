@@ -40,16 +40,11 @@ jobs:
       - name: Set environment variables
         run: |
           echo "ENVIRONMENT=dev" >> $GITHUB_ENV
-          echo "STACK_NAME=blot-parser-infrastructure-dev" >> $GITHUB_ENV
+          echo "STACK_NAME=astra-infrastructure-dev" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
 
       - name: Upload CloudFormation templates to S3
         run: |
-          # Debug: Show current directory and file structure
-          echo "Current directory: $(pwd)"
-          echo "Contents of aws-infra/cloudformation/:"
-          ls -la aws-infra/cloudformation/
-          
           # Create deployment bucket if it doesn't exist
           DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-${AWS_ACCOUNT_ID}"
           aws s3 mb "s3://$DEPLOYMENT_BUCKET" --region $AWS_REGION || echo "Bucket already exists"
@@ -58,10 +53,7 @@ jobs:
           cd aws-infra
           
           # Upload only essential templates for now
-          echo "Uploading s3.yaml..."
           aws s3 cp cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
-          
-          echo "Uploading vpc.yaml..."
           aws s3 cp cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
 
       - name: Deploy CloudFormation stack
@@ -75,50 +67,4 @@ jobs:
               AWSAccountId=$AWS_ACCOUNT_ID \
             --capabilities CAPABILITY_NAMED_IAM \
             --region $AWS_REGION
-
-      - name: Get stack outputs
-        id: stack-outputs
-        run: |
-          INPUT_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs[?OutputKey==`InputBucketName`].OutputValue' \
-            --output text \
-            --region $AWS_REGION)
-          
-          DEPLOYMENT_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs[?OutputKey==`DeploymentBucketName`].OutputValue' \
-            --output text \
-            --region $AWS_REGION)
-          
-          VPC_ID=$(aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue' \
-            --output text \
-            --region $AWS_REGION)
-          
-          echo "INPUT_BUCKET=$INPUT_BUCKET" >> $GITHUB_OUTPUT
-          echo "DEPLOYMENT_BUCKET=$DEPLOYMENT_BUCKET" >> $GITHUB_OUTPUT
-          echo "VPC_ID=$VPC_ID" >> $GITHUB_OUTPUT
-
-      - name: Create environment file
-        run: |
-          cat > blot-parser/.env << EOF
-          # AWS Infrastructure Configuration (DEV)
-          AWS_REGION=$AWS_REGION
-          INPUT_BUCKET=${{ steps.stack-outputs.outputs.INPUT_BUCKET }}
-          DEPLOYMENT_BUCKET=${{ steps.stack-outputs.outputs.DEPLOYMENT_BUCKET }}
-          VPC_ID=${{ steps.stack-outputs.outputs.VPC_ID }}
-          ENVIRONMENT=dev
-          PROJECT_NAME=$PROJECT_NAME
-          LOG_LEVEL=INFO
-          EOF
-
-      - name: Commit environment file
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add blot-parser/.env
-          git commit -m "Update environment configuration for DEV" || echo "No changes to commit"
-          git push
 
