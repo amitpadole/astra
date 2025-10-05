@@ -1,0 +1,112 @@
+name: Cleanup Old Stacks
+
+on:
+  schedule:
+    # Run every day at 2 AM UTC (adjust timezone as needed)
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      keep_count:
+        description: 'Number of recent stacks to keep'
+        required: false
+        default: '3'
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: astra
+
+jobs:
+  cleanup-stacks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Clean up old CloudFormation stacks
+        run: |
+          # Set number of stacks to keep (default: 3)
+          KEEP_COUNT=${INPUT_KEEP_COUNT:-3}
+          echo "Keeping the $KEEP_COUNT most recent stacks"
+          
+          # List all astra infrastructure stacks (excluding nested stacks)
+          echo "Finding all astra infrastructure stacks..."
+          STACKS=$(aws cloudformation list-stacks \
+            --query 'StackSummaries[?contains(StackName, `astra-infrastructure-dev`) && StackStatus==`CREATE_COMPLETE` && !contains(StackName, `-S3Stack-`) && !contains(StackName, `-VPCStack-`)].{StackName:StackName,CreationTime:CreationTime}' \
+            --output json)
+          
+          if [ "$STACKS" = "[]" ] || [ -z "$STACKS" ]; then
+            echo "No stacks found to clean up"
+            exit 0
+          fi
+          
+          # Sort by creation time (newest first) and get stack names
+          STACK_NAMES=$(echo "$STACKS" | jq -r 'sort_by(.CreationTime) | reverse | .[].StackName')
+          STACK_COUNT=$(echo "$STACK_NAMES" | wc -l)
+          
+          echo "Found $STACK_COUNT stacks"
+          echo "Stack names:"
+          echo "$STACK_NAMES"
+          
+          if [ "$STACK_COUNT" -le "$KEEP_COUNT" ]; then
+            echo "Only $STACK_COUNT stacks found, keeping all (limit: $KEEP_COUNT)"
+            exit 0
+          fi
+          
+          # Calculate how many to delete
+          DELETE_COUNT=$((STACK_COUNT - KEEP_COUNT))
+          echo "Will delete $DELETE_COUNT oldest stacks"
+          
+          # Get stacks to delete (oldest ones)
+          STACKS_TO_DELETE=$(echo "$STACK_NAMES" | tail -n $DELETE_COUNT)
+          
+          echo "Stacks to delete:"
+          echo "$STACKS_TO_DELETE"
+          
+          # Delete each stack
+          for STACK_NAME in $STACKS_TO_DELETE; do
+            echo "Deleting stack: $STACK_NAME"
+            aws cloudformation delete-stack --stack-name "$STACK_NAME"
+            
+            # Wait for deletion to complete
+            echo "Waiting for $STACK_NAME to be deleted..."
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" || echo "Stack $STACK_NAME deletion completed or timed out"
+          done
+          
+          echo "Cleanup completed!"
+
+      - name: Clean up old S3 buckets
+        run: |
+          echo "Checking for old S3 buckets to clean up..."
+          
+          # List all astra deployment buckets
+          BUCKETS=$(aws s3 ls | grep "astra-deployments-dev-" | awk '{print $3}')
+          
+          if [ -z "$BUCKETS" ]; then
+            echo "No deployment buckets found to clean up"
+            exit 0
+          fi
+          
+          echo "Found deployment buckets:"
+          echo "$BUCKETS"
+          
+          # Keep the most recent bucket, delete others
+          RECENT_BUCKET=$(echo "$BUCKETS" | sort | tail -n 1)
+          echo "Keeping most recent bucket: $RECENT_BUCKET"
+          
+          for BUCKET in $BUCKETS; do
+            if [ "$BUCKET" != "$RECENT_BUCKET" ]; then
+              echo "Deleting old bucket: $BUCKET"
+              aws s3 rb "s3://$BUCKET" --force || echo "Failed to delete bucket $BUCKET"
+            fi
+          done
+          
+          echo "S3 bucket cleanup completed!"
+

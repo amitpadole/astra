@@ -68,17 +68,3 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --region $AWS_REGION
 
-      - name: Clean up old stacks (optional)
-        run: |
-          # List all stacks with astra-infrastructure-dev prefix
-          OLD_STACKS=$(aws cloudformation list-stacks \
-            --query 'StackSummaries[?contains(StackName, `astra-infrastructure-dev`) && StackStatus==`CREATE_COMPLETE`].StackName' \
-            --output text)
-          
-          # Keep only the 3 most recent stacks, delete the rest
-          if [ ! -z "$OLD_STACKS" ]; then
-            echo "Found old stacks: $OLD_STACKS"
-            # This is optional - you can remove this step if you want to keep all stacks
-            echo "Note: Old stack cleanup is disabled for safety. Manual cleanup recommended."
-          fi
-
