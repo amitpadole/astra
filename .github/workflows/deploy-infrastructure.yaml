@@ -46,6 +46,16 @@ jobs:
           echo "TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
           echo "STACK_NAME=astra-infrastructure-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}-${TIMESTAMP}" >> $GITHUB_ENV
 
+      - name: Check if network infrastructure exists
+        run: |
+          if ! aws cloudformation describe-stacks --stack-name astra-network-$ENVIRONMENT --query 'Stacks[0].StackStatus' --output text 2>/dev/null; then
+            echo "❌ Network infrastructure not found. Please deploy network first."
+            echo "Run: gh workflow run deploy-network.yaml -f environment=$ENVIRONMENT"
+            exit 1
+          else
+            echo "✅ Network infrastructure found"
+          fi
+
       - name: Upload CloudFormation templates to S3
         working-directory: aws-infra
         run: |
@@ -73,3 +83,7 @@ jobs:
           echo "Application infrastructure deployed successfully!"
           echo "Stack Name: $STACK_NAME"
           echo "Environment: $ENVIRONMENT"
+          
+          # Check if all child stacks are healthy
+          echo "Checking child stack status..."
+          aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE --query "StackSummaries[?contains(StackName, 'astra-infrastructure-$ENVIRONMENT')].{Name:StackName,Status:StackStatus}" --output table

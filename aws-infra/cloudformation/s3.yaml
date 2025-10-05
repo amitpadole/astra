@@ -19,7 +19,7 @@ Resources:
   InputBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${ProjectName}-input-${Environment}-${AWSAccountId}-${AWS::StackId}'
+      BucketName: !Sub '${ProjectName}-input-${Environment}-${AWSAccountId}'
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -52,7 +52,7 @@ Resources:
   DeploymentBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${ProjectName}-deployments-${Environment}-${AWSAccountId}-${AWS::StackId}'
+      BucketName: !Sub '${ProjectName}-deployments-${Environment}-${AWSAccountId}'
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -96,22 +96,22 @@ Outputs:
     Description: S3 bucket for input files
     Value: !Ref InputBucket
     Export:
-      Name: !Sub '${ProjectName}-InputBucket-${Environment}-${AWS::StackId}'
+      Name: !Sub '${ProjectName}-InputBucket-${Environment}'
   
   InputBucketArn:
     Description: S3 bucket ARN for input files
     Value: !GetAtt InputBucket.Arn
     Export:
-      Name: !Sub '${ProjectName}-InputBucketArn-${Environment}-${AWS::StackId}'
+      Name: !Sub '${ProjectName}-InputBucketArn-${Environment}'
   
   DeploymentBucketName:
     Description: S3 bucket for Lambda deployments
     Value: !Ref DeploymentBucket
     Export:
-      Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}-${AWS::StackId}'
+      Name: !Sub '${ProjectName}-DeploymentBucket-${Environment}'
   
   DeploymentBucketArn:
     Description: S3 bucket ARN for deployments
     Value: !GetAtt DeploymentBucket.Arn
     Export:
-      Name: !Sub '${ProjectName}-DeploymentBucketArn-${Environment}-${AWS::StackId}'
+      Name: !Sub '${ProjectName}-DeploymentBucketArn-${Environment}'

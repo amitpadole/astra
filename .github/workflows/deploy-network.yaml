@@ -12,7 +12,7 @@ on:
           - dev
           - prod
   push:
-    branches: [main]
+    branches: [develop, main]
     paths:
       - 'aws-infra/cloudformation/network.yaml'
       - '.github/workflows/deploy-network.yaml'
@@ -20,7 +20,7 @@ on:
 jobs:
   deploy-network:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'prod' }}
+    environment: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}
     
     steps:
       - name: Checkout code
@@ -35,10 +35,10 @@ jobs:
 
       - name: Set environment variables
         run: |
-          echo "ENVIRONMENT=${{ github.event.inputs.environment || 'prod' }}" >> $GITHUB_ENV
+          echo "ENVIRONMENT=${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}" >> $GITHUB_ENV
           echo "PROJECT_NAME=astra" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
-          echo "STACK_NAME=astra-network-${{ github.event.inputs.environment || 'prod' }}" >> $GITHUB_ENV
+          echo "STACK_NAME=astra-network-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod') || 'dev' }}" >> $GITHUB_ENV
 
       - name: Upload CloudFormation template to S3
         working-directory: aws-infra
