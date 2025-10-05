@@ -44,17 +44,15 @@ jobs:
           echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
 
       - name: Upload CloudFormation templates to S3
+        working-directory: aws-infra
         run: |
           # Create deployment bucket if it doesn't exist
           DEPLOYMENT_BUCKET="${PROJECT_NAME}-deployments-dev-${AWS_ACCOUNT_ID}"
           aws s3 mb "s3://$DEPLOYMENT_BUCKET" --region $AWS_REGION || echo "Bucket already exists"
           
-          # Change to aws-infra directory
-          cd aws-infra
-          
           # Upload only essential templates for now
-          aws s3 cp aws-infra/cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
-          aws s3 cp aws-infra/cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
+          aws s3 cp cloudformation/s3.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/s3.yaml"
+          aws s3 cp cloudformation/vpc.yaml "s3://$DEPLOYMENT_BUCKET/cloudformation/vpc.yaml"
 
       - name: Deploy CloudFormation stack
         run: |
