@@ -26,6 +26,7 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 DYNAMODB_TABLE_NAME = os.environ.get('DYNAMODB_TABLE_NAME', 'blot-parser-data')
+DYNAMODB_STATUS_TABLE_NAME = os.environ.get('DYNAMODB_STATUS_TABLE_NAME', 'blot-parser-status')
 S3_BUCKET = os.environ.get('S3_BUCKET', 'blot-parser-input')
 
 
@@ -38,6 +39,7 @@ class LambdaBlotParser:
         self.excel_processor = ExcelProcessor()
         self.vendor_detector = VendorDetector()
         self.dynamodb_table = dynamodb.Table(DYNAMODB_TABLE_NAME)
+        self.status_table = dynamodb.Table(DYNAMODB_STATUS_TABLE_NAME)
     
     def process_s3_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -103,13 +105,16 @@ class LambdaBlotParser:
             Processing result
         """
         try:
-            # Download file from S3
-            response = s3_client.get_object(Bucket=bucket, Key=key)
-            file_content = response['Body'].read()
-            
             # Extract vendor from filename
             filename = key.split('/')[-1]
             vendor = self.vendor_detector.extract_vendor_from_filename(filename)
+            
+            # Save processing status
+            self.save_processing_status(filename, vendor, 'processing', 'Starting file processing')
+            
+            # Download file from S3
+            response = s3_client.get_object(Bucket=bucket, Key=key)
+            file_content = response['Body'].read()
             
             # Process Excel file
             excel_data = self.excel_processor.read_excel_file_from_bytes(file_content, filename)
@@ -134,6 +139,9 @@ class LambdaBlotParser:
             # Save to DynamoDB
             saved_count = self.save_to_dynamodb(mapped_records, filename, vendor)
             
+            # Save completion status
+            self.save_processing_status(filename, vendor, 'completed', f'Successfully processed {saved_count} records')
+            
             return {
                 'status': 'success',
                 'file': filename,
@@ -144,6 +152,12 @@ class LambdaBlotParser:
             
         except Exception as e:
             logger.error(f"Error processing S3 file {key}: {str(e)}")
+            
+            # Save error status
+            filename = key.split('/')[-1]
+            vendor = self.vendor_detector.extract_vendor_from_filename(filename)
+            self.save_processing_status(filename, vendor, 'error', f'Processing failed: {str(e)}')
+            
             return {
                 'status': 'error',
                 'message': str(e),
@@ -172,6 +186,11 @@ class LambdaBlotParser:
                 record['vendor'] = vendor
                 record['processed_at'] = str(pd.Timestamp.now())
                 
+                # Set TTL to 90 days from now (DynamoDB TTL expects Unix timestamp)
+                import time
+                ttl_timestamp = int(time.time()) + (90 * 24 * 60 * 60)  # 90 days in seconds
+                record['ttl'] = ttl_timestamp
+                
                 # Save to DynamoDB
                 self.dynamodb_table.put_item(Item=record)
                 saved_count += 1
@@ -181,6 +200,39 @@ class LambdaBlotParser:
         
         logger.info(f"Saved {saved_count}/{len(records)} records to DynamoDB")
         return saved_count
+    
+    def save_processing_status(self, filename: str, vendor: str, status: str, message: str = None) -> None:
+        """
+        Save file processing status to DynamoDB status table
+        
+        Args:
+            filename: Source filename
+            vendor: Vendor name
+            status: Processing status (processing, completed, error)
+            message: Optional status message
+        """
+        try:
+            import time
+            
+            # Set TTL to 90 days from now (DynamoDB TTL expects Unix timestamp)
+            ttl_timestamp = int(time.time()) + (90 * 24 * 60 * 60)  # 90 days in seconds
+            
+            status_record = {
+                'file_name': filename,
+                'processed_at': str(pd.Timestamp.now()),
+                'vendor': vendor,
+                'status': status,
+                'ttl': ttl_timestamp
+            }
+            
+            if message:
+                status_record['message'] = message
+                
+            self.status_table.put_item(Item=status_record)
+            logger.info(f"Saved processing status for {filename}: {status}")
+            
+        except Exception as e:
+            logger.error(f"Error saving status for {filename}: {str(e)}")
 
 
 def lambda_handler(event, context):

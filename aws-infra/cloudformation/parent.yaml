@@ -48,18 +48,18 @@ Resources:
   
   #Phase 2 - Uncomment these stacks gradually
   # DynamoDB Resources Stack (depends on S3Stack)
-  # DynamoDBStack:
-  #    Type: AWS::CloudFormation::Stack
-  #    Properties:
-  #      TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/dynamodb.yaml'
-  #      Parameters:
-  #        Environment: !Ref Environment
-  #        ProjectName: !Ref ProjectName
-  #      Tags:
-  #        - Key: Project
-  #          Value: !Ref ProjectName
-  #        - Key: Environment
-  #          Value: !Ref Environment
+  DynamoDBStack:
+     Type: AWS::CloudFormation::Stack
+     Properties:
+       TemplateURL: !Sub 'https://${ProjectName}-deployments-${Environment}-${AWSAccountId}.s3.${AWS::Region}.amazonaws.com/cloudformation/dynamodb.yaml'
+       Parameters:
+         Environment: !Ref Environment
+         ProjectName: !Ref ProjectName
+       Tags:
+         - Key: Project
+           Value: !Ref ProjectName
+         - Key: Environment
+           Value: !Ref Environment
 
   # IAM Resources Stack (depends on S3Stack and DynamoDBStack)
   # IAMStack:
@@ -160,17 +160,29 @@ Outputs:
   # 
   # TODO: Phase 2 - Uncomment these outputs gradually
   # DynamoDB Outputs
-  # DataTableName:
-  #   Description: DynamoDB table for processed data
-  #   Value: !GetAtt DynamoDBStack.Outputs.DataTableName
-  #   Export:
-  #     Name: !Sub '${ProjectName}-DataTable-${Environment}'
+  DataTableName:
+    Description: DynamoDB table for processed data
+    Value: !GetAtt DynamoDBStack.Outputs.DataTableName
+    Export:
+      Name: !Sub '${ProjectName}-DataTable-${Environment}'
   
-  # DataTableArn:
-  #   Description: DynamoDB table ARN
-  #   Value: !GetAtt DynamoDBStack.Outputs.DataTableArn
-  #   Export:
-  #     Name: !Sub '${ProjectName}-DataTableArn-${Environment}'
+  DataTableArn:
+    Description: DynamoDB table ARN
+    Value: !GetAtt DynamoDBStack.Outputs.DataTableArn
+    Export:
+      Name: !Sub '${ProjectName}-DataTableArn-${Environment}'
+  
+  StatusTableName:
+    Description: DynamoDB table for file processing status
+    Value: !GetAtt DynamoDBStack.Outputs.StatusTableName
+    Export:
+      Name: !Sub '${ProjectName}-StatusTable-${Environment}'
+  
+  StatusTableArn:
+    Description: DynamoDB table ARN for file processing status
+    Value: !GetAtt DynamoDBStack.Outputs.StatusTableArn
+    Export:
+      Name: !Sub '${ProjectName}-StatusTableArn-${Environment}'
   
   # IAM Outputs
   # LambdaRoleArn:
